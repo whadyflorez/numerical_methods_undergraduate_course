@@ -25,14 +25,16 @@ def exacta(t):
 
 tf=200.0 
 
-nsteps=50
+nsteps=25
 dt=tf/nsteps
 nt=nsteps+1 
 
 data=np.zeros((nt,2))
 data_exacta=np.zeros((nt,2))
+data_rk=np.zeros((nt,2))
 
 data[0,:]=[t0,v0]
+data_rk[0,:]=[t0,v0]
 
 for i in range(nsteps):
     vnew=v0+dt*df(v0,t0)
@@ -40,22 +42,44 @@ for i in range(nsteps):
     data[i+1,:]=[tnew,vnew]
     t0=tnew
     v0=vnew
+
+#metodo rk
+t0=0
+v0=0
+for i in range(nsteps):
+    k1=df(v0,t0)
+    k2=df(v0+0.5*dt*k1,t0+0.5*dt)
+    k3=df(v0+0.5*dt*k2,t0+0.5*dt)
+    k4=df(v0+dt*k3,t0+dt)
+    vnew_rk=v0+(dt/6)*(k1+2*k2+2*k3+k4)
+    tnew=t0+dt
+    data_rk[i+1,:]=[tnew,vnew_rk]
+    t0=tnew
+    v0=vnew_rk
+    
+    
     
 for i in range(nt):
     data_exacta[i,:]=[data[i,0],exacta(data[i,0])] 
     
 
 plt.figure()
-plt.plot(data[:,0],data[:,1],'o')
-plt.plot(data_exacta[:,0],data_exacta[:,1],'r-')
+plt.plot(data[:,0],data[:,1],'o',label='euler')
+plt.plot(data_exacta[:,0],data_exacta[:,1],'r-',label='exact')
+plt.plot(data_rk[:,0],data_rk[:,1],'+',label='rk4')
 plt.xlabel('t')
 plt.ylabel('v(t)')
+plt.legend(loc='upper right')
 
 
 plt.figure()
-plt.plot(data_exacta[:,0],data[:,1]-data_exacta[:,1],'-')
+
+plt.plot(data_exacta[:,0],data[:,1]-data_exacta[:,1],'-',label='euler')
+plt.plot(data_exacta[:,0],data_rk[:,1]-data_exacta[:,1],'--',label='rk')
 plt.xlabel('t')
 plt.ylabel('error neto')
+plt.legend(loc='upper right')
+
 
 
 
