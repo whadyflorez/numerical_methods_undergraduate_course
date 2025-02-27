@@ -8,6 +8,7 @@ def multiquadric_rbf(r, c):
 # Datos conocidos (nodos de interpolación)
 x_nodes = np.linspace(-5, 5, 10)
 y_nodes = np.sin(x_nodes)
+#y_nodes =np.ones_like(x_nodes)
 
 # Parámetro de forma
 c = 1.0
@@ -35,6 +36,7 @@ plt.figure(figsize=(8, 5))
 plt.plot(x_nodes, y_nodes, 'ro', label='Nodos')
 plt.plot(x_eval, y_interp, 'b-', label='Interpolación RBF')
 plt.plot(x_eval, np.sin(x_eval), 'g--', label='Función real')
+#plt.plt.plot(x_eval, np.ones_like(x_eval),'g--', label='Función real')
 plt.legend()
 plt.xlabel('x')
 plt.ylabel('f(x)')

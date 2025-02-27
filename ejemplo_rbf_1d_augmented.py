@@ -7,12 +7,13 @@ def multiquadric_rbf(r, c):
 
 # Funciones de aumento explícitas
 def augmentation_functions(x):
-#    return np.vstack((np.ones_like(x), np.sin(x), np.cos(x))).T  # Términos constantes, lineales y cuadráticos
-    return np.vstack((np.ones_like(x), x, x**2)).T  # Términos constantes, lineales y cuadráticos
+    return np.vstack((np.ones_like(x), np.sin(x), np.cos(x))).T  # Términos constantes, lineales y cuadráticos
+#    return np.vstack((np.ones_like(x), x, x**2)).T  # Términos constantes, lineales y cuadráticos
 
 # Datos conocidos (nodos de interpolación)
 x_nodes = np.linspace(-5, 5, 10)
 y_nodes = np.sin(x_nodes)
+#y_nodes = np.ones_like(x_nodes)
 
 # Parámetro de forma
 c = 1.0
@@ -44,14 +45,15 @@ y_interp = np.zeros_like(x_eval)
 for i in range(len(x_eval)):
     for j in range(n):
         y_interp[i] += coeffs[j] * multiquadric_rbf(abs(x_eval[i] - x_nodes[j]), c)
-#    y_interp[i] += coeffs[n] + coeffs[n+1] * np.sin(x_eval[i]) + coeffs[n+2] * np.cos(x_eval[i])  # Aplicar términos de aumento
-    y_interp[i] += coeffs[n] + coeffs[n+1] * x_eval[i] + coeffs[n+2] * x_eval[i]**2  # Aplicar términos de aumento
+    y_interp[i] += coeffs[n] + coeffs[n+1] * np.sin(x_eval[i]) + coeffs[n+2] * np.cos(x_eval[i])  # Aplicar términos de aumento
+#    y_interp[i] += coeffs[n] + coeffs[n+1] * x_eval[i] + coeffs[n+2] * x_eval[i]**2  # Aplicar términos de aumento
 
 # Graficar resultados
 plt.figure(figsize=(8, 5))
 plt.plot(x_nodes, y_nodes, 'ro', label='Nodos')
 plt.plot(x_eval, y_interp, 'b-', label='Interpolación RBF con aumento')
 plt.plot(x_eval, np.sin(x_eval), 'g--', label='Función real')
+#plt.plot(x_eval, np.ones_like(x_eval), 'g--', label='Función real')
 plt.legend()
 plt.xlabel('x')
 plt.ylabel('f(x)')
