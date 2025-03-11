@@ -8,6 +8,7 @@ Created on Mon Mar 10 21:02:55 2025
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+
 x=np.array([0,1,2,3])
 y=np.array([4,2,0])
 
