@@ -64,8 +64,8 @@ arriba=list(range(110,121))
 for i in internos:
     A[i,i+1]=1/dx**2
     A[i,i-1]=1/dx**2
-    A[i,i+4]=1/dy**2
-    A[i,i-4]=1/dy**2
+    A[i,i+11]=1/dy**2
+    A[i,i-11]=1/dy**2
     A[i,i]=-2/dx**2-2/dy**2
     B[i]=0
     
