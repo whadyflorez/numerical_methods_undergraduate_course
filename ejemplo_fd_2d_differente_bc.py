@@ -66,20 +66,23 @@ for i in internos:
     A[i,i-1]=1/dx**2
     A[i,i+11]=1/dy**2
     A[i,i-11]=1/dy**2
-    A[i,i]=-2/dx**2-2/dy**2
+    A[i,i]=-2/dx**2-2/dy**2-100
     B[i]=0
     
 for i in izquierda:
-    A[i,i]=1 
-    B[i]=0
+    A[i,i]=-1/dx
+    A[i,i+1]=1/dx
+    B[i]=100
 
 for i in derecha:
-    A[i,i]=1 
+    A[i,i]=1/dx
+    A[i,i-1]=-1/dx
     B[i]=0
 
 for i in abajo:
-    A[i,i]=1 
-    B[i]=0   
+    A[i,i]=-1/dy-1
+    A[i,i+11]=1/dy
+    B[i]=-10   
     
 for i in arriba:
     A[i,i]=1 
