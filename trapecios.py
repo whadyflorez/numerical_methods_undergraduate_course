@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # Función a integrar
 f = lambda x: np.sin(x)
 a, b = 0, np.pi  # Límites de integración
-n = 10           # Número de subintervalos
+n = 100           # Número de subintervalos
 x = np.linspace(a, b, n+1)
 y = f(x)
 dx = (b - a) / n

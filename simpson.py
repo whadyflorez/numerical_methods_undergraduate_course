@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 # Función a integrar
 f = lambda x: np.sin(x)
 a, b = 0, np.pi
-n = 10  # Debe ser par
+n = 4  # Debe ser par
 if n % 2 != 0:
     raise ValueError("n debe ser par para aplicar la regla de Simpson.")
 

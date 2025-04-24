@@ -2,8 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 f = lambda x: np.sin(x)
+
+# def f(x):
+#     y=np.sin(x)
+#     return y
+
 a, b = 0, np.pi
-n = 5
+n = 50
 x = np.linspace(a, b, 100)
 xi = np.linspace(a, b, n+1)
 dx = (b - a) / n
