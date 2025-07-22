@@ -9,43 +9,46 @@ import numpy as np
 
 mu=1.0e-3 #Pa.s
 rho=1000.0 #kg/m^3
-V=0.025 #m/s
+V=1.0 #m/s
 D=2.0e-2 #m
 
-Re=V*rho*D/mu
+#Re=V*rho*D/mu
 
 def funcion_Re(vel,diam,visc,dens):
-    f=vel*diam*dens/visc
-    return f
+   f=vel*diam*dens/visc
+   return f
 
 def Re_lista(lista):
     f=lista[0]*lista[1]*lista[3]/lista[2]
     return f
     
-
-print('Re=',Re)
-print('Re funcion=',funcion_Re(V,D,mu,rho))
+#Re=funcion_Re(V,D,mu,rho)
+#print('Re=',Re)
+#print('Re funcion=',funcion_Re(V,D,mu,rho))
 
 lista_variables=[V,D,mu,rho]
-print('Re_lista=',Re_lista(lista_variables))
+Re=Re_lista(lista_variables)
+print('Re_lista=',Re)
 
 if Re <= 2300.0:
-    clasificacion='laminar'
+   clasificacion='laminar'
 if Re>2300.0 and Re<4000.0:
-    clasificacion='transición'
+   clasificacion='transición'
 if Re>=4000.0:
-    clasificacion='turbulento'
+   clasificacion='turbulento'
    
 def funcion_clasificacion(Re):
-    if Re <= 2300.0:
-        clasificacion='laminar'
-    if Re>2300.0 and Re<4000.0:
-        clasificacion='transición'
-    if Re>=4000.0:
-        clasificacion='turbulento' 
-    return clasificacion   
+   if Re <= 2300.0:
+       clasificacion='laminar'
+   if Re>2300.0 and Re<4000.0:
+       clasificacion='transición'
+   if Re>=4000.0:
+       clasificacion='turbulento' 
+   return clasificacion   
 
-print('El tipo de flujo es ',funcion_clasificacion(Re))    
+print('El tipo de flujo es ',funcion_clasificacion(Re))  
+
+  
 
 
 
