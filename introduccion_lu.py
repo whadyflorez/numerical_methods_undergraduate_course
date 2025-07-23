@@ -9,6 +9,7 @@ import numpy as np
 from scipy.linalg import lu
 
 A=np.array([[1,2,3,1],[2,5,-1,1],[4,2,7,1]])
+#Acopy=A
 
 A[1,:]=A[1,:]+(-2)*A[0,:]
 print(A)
@@ -20,12 +21,13 @@ print(A)
 x=np.zeros(3)
 
 x[2]=A[2,3]/A[2,2]
-x[1]=(A[1,3]-A[1,2]*x[2])/A[1,2]
+x[1]=(A[1,3]-A[1,2]*x[2])/A[1,1]
 x[0]=(A[0,3]-A[0,1]*x[1]-A[0,2]*x[2])/A[0,0]
 
+#E=np.matmul(Acopy[:,0:3],x)
 
-F=lu(A[0:3,0:3])
+#F=lu(A[0:3,0:3])
 
 
-z=np.linalg.solve(A[0:3,0:3],A[:,3])
-E=np.matmul(A[0:3,0:3],z)-A[:,3]
+#z=np.linalg.solve(Acopy[0:3,0:3],Acopy[:,3])
+#E=np.matmul(A[0:3,0:3],z)-A[:,3]
