@@ -7,6 +7,7 @@ Created on Thu Jul 24 06:10:31 2025
 """
 import numpy as np
 from scipy.linalg import solve,det,lstsq,lu
+import matplotlib.pyplot as plt
 
 
 A=np.array([[1,1,0,0,0],[1,0,-1,0,-1],[0,1,1,-1,0],[0,0,0,1,1]])
@@ -23,8 +24,13 @@ P,L,U=lu(A)
 #redefinir el problema x1=60,x3=10
 A=np.array([[1,1,0,0,0],[0,1,1,-1,0],[0,0,0,1,1],[1,0,0,0,0],[0,0,1,0,0]])
 rhs=np.array([100,0,100,60,10])
+print(det(A))
+
 xx=solve(A,rhs)
 print(det(A))
+
+
+plt.spy(A)
 
 
 
