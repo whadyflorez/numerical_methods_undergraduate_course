@@ -18,4 +18,17 @@ A[:,0]=x
 A[:,1]=1.0
 
 p=lstsq(A,y)
-solucion=p[0]
+param=p[0]
+
+nplot=50
+xplot=np.linspace(0,6,nplot)
+yplot=[]
+for i in range(nplot):
+    yaprox=param[0]*xplot[i]+param[1]
+    yplot.append(yaprox)
+    
+plt.figure()
+plt.plot(xplot,yplot,'--')
+plt.plot(x,y,'o')    
+    
+    
