@@ -11,7 +11,7 @@ def f(x):
     return np.sin(x)+x
 
 def df(x):
-    h=0.001*np.abs(x)
+    h=0.1*np.abs(x)
     derecha=(f(x+h)-f(x))/h
     izquierda=(f(x)-f(x-h))/h
     centrada=(f(x+h)-f(x-h))/(2*h)
@@ -20,7 +20,7 @@ def df(x):
 def df_exacta(x):
     return np.cos(x)+1
 
-x=1.0
+x=3.1
 
 print(df(x),df_exacta(x))
 
