@@ -16,39 +16,15 @@ def J(X):
     return jac
 
 X0=np.array([1,1.5])
-Error=F(X0)
-sigma=norm(Error)
-print(sigma)
-
-M=J(X0)
-B=F(X0)
-dX=solve(M,-B)
-X1=X0+dX
-Error=F(X1)
-sigma=norm(Error)
-print(sigma)
 
 
-M=J(X1)
-B=F(X1)
-dX=solve(M,-B)
-X2=X1+dX
-Error=F(X2)
-sigma=norm(Error)
-print(sigma)
+for _ in range(30):
+    Error=F(X0)
+    sigma=norm(Error)
+    print(sigma)
+    M=J(X0)
+    B=-F(X0)
+    dX=solve(M,B)
+    X1=X0+0.25*dX
+    X0=X1
 
-M=J(X2)
-B=F(X2)
-dX=solve(M,-B)
-X3=X2+dX
-Error=F(X3)
-sigma=norm(Error)
-print(sigma)
-
-M=J(X3)
-B=F(X3)
-dX=solve(M,-B)
-X4=X3+dX
-Error=F(X4)
-sigma=norm(Error)
-print(sigma)
