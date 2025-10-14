@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 L=5e-2
 n=25
 dx=L/(n-1)
-dt=5
+dt=0.1
 alpha=1e-6 
 tfinal= 60*60
 nt=int(tfinal/dt)
