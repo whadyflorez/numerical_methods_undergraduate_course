@@ -36,6 +36,7 @@ resultado = minimize(
 )
 
 print('Resultados minimizacion ',resultado.x)
+print('el valor minimo de la funcion es',resultado.fun)
 
 resultado2 = minimize(
     f_obj,
