@@ -15,7 +15,7 @@ ydata=np.array([1.0,1.7,1.5,5.0])
 n=len(xdata)
 
 def modelo(x,*args):
-    y=args[0]+args[1]*x
+    y=args[0]*np.exp(args[1]*x)
     return y
 
 def error(p):
@@ -28,7 +28,14 @@ def error(p):
 
 nparams=2
 random.seed(42)
-params = [random.uniform(-1, 1) for _ in range(nparams)]        
+params = [random.uniform(-1, 1) for _ in range(nparams)]  
+
+#for explicito
+#params=[]
+#for i in range(nparams):
+#    aleatorio=random.uniform(-1,1)
+#    params.append(aleatorio)
+          
 
 
 n_m=20
@@ -47,8 +54,8 @@ for i in range(n_m):
 
 plt.figure()
 plt.plot(x_m,y_m1,'--',label=r'$p_{arbitrarios}$') 
-plt.plot(xdata,ydata,'o',label=r'$p_{ajustados}$')   
-plt.plot(x_m,y_m2,'-.') 
+plt.plot(xdata,ydata,'o',label='datos reales')   
+plt.plot(x_m,y_m2,'-.',label=r'$p_{ajustados}$') 
 plt.legend()
 
 print(f'Error con parametros arbitrarios {error(params):.3E}')
