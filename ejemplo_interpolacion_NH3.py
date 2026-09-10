@@ -2,6 +2,7 @@
 
 import numpy as np
 from scipy.linalg import solve
+from numpy.linalg import cond,det
 
 data=np.array([[400.0,0.5136],[420.0,0.4888],\
              [460.0,0.4460],[480.0,0.4273],\
@@ -17,7 +18,9 @@ for i in range(ndata):
     for j in range(ndata):
         A[i,j]=data[i,0]**j
         
-p=solve(A,B)        
+p=solve(A,B)  
+
+Error=np.matmul(A,p)-B      
 
 def m(x):
    suma=0.0
@@ -26,3 +29,6 @@ def m(x):
    return suma  
 
 print(m(490.0))    
+
+print('numero de condicion',cond(A))
+
