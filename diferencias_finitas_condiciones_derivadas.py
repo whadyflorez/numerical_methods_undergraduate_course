@@ -1,4 +1,4 @@
-#ejemplo diferencias finitas en 2D basico
+##ejemplo diferencias finitas en 2D basico
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -28,14 +28,16 @@ for i in l_base:
     A[i,i]=1.0
     B[i]=0.0
 for i in l_derecha:
-    A[i,i]=1.0 
-    B[i]=0.0
+    A[i,i]=1.0/dx
+    A[i,i-1]=-1.0/dx
+    B[i]=-100.0
 for i in l_izquierda:
     A[i,i]=1.0
     B[i]=0.0
 for i in l_arriba:
-    A[i,i]=1.0
-    B[i]=1.0
+    A[i,i]=1.0/dy
+    A[i,i-5]=-1.0/dy
+    B[i]=-100.0
 
 T=np.linalg.solve(A,B)    
 
@@ -94,12 +96,12 @@ plt.show()
 fig = plt.figure()
 ax = fig.add_subplot(111, projection="3d")
 
-#superficie = ax.plot_surface(
-#    X, Y, Resultados,
-#    cmap="hot",
-#    edgecolor="black",
-#    linewidth=0.5
-#)
+superficie = ax.plot_surface(
+    X, Y, Resultados,
+    cmap="hot",
+    edgecolor="black",
+    linewidth=0.5
+)
 
 plt.contour(
     X,
