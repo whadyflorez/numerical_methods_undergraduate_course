@@ -1,0 +1,994 @@
+\documentclass[aspectratio=169,11pt]{beamer}
+
+% ---------- Codificación e idioma ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[spanish]{babel}
+\decimalpoint % punto decimal en modo matematico (coherente con Python)
+\usepackage{amsmath,amssymb,booktabs,graphicx,xcolor,listings,array}
+
+% ---------- Tema y paleta (azul marino / dorado) ----------
+\usetheme{Madrid}
+\definecolor{navy}{HTML}{1F3864}
+\definecolor{gold}{HTML}{C9A227}
+\definecolor{redd}{HTML}{B03A2E}
+\definecolor{greend}{HTML}{2E7D5B}
+\setbeamercolor{structure}{fg=navy}
+\setbeamercolor{palette primary}{bg=navy,fg=white}
+\setbeamercolor{palette secondary}{bg=navy!85!black,fg=white}
+\setbeamercolor{palette tertiary}{bg=navy!70!black,fg=white}
+\setbeamercolor{title}{bg=navy,fg=white}
+\setbeamercolor{frametitle}{bg=navy,fg=white}
+\setbeamercolor{block title}{bg=navy,fg=white}
+\setbeamercolor{block body}{bg=navy!7,fg=black}
+\setbeamercolor{block title alerted}{bg=redd,fg=white}
+\setbeamercolor{block body alerted}{bg=redd!8,fg=black}
+\setbeamercolor{block title example}{bg=gold,fg=black}
+\setbeamercolor{block body example}{bg=gold!12,fg=black}
+\setbeamercolor{item}{fg=gold}
+% Evita el degradado de los bloques (macOS Preview lo dibuja como banda negra)
+\setbeamertemplate{blocks}[default]
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+
+% ---------- Listados de código Python ----------
+\lstdefinestyle{py}{
+  language=Python, basicstyle=\ttfamily\scriptsize, keywordstyle=\color{navy}\bfseries,
+  commentstyle=\color{gray}\itshape, stringstyle=\color{redd},
+  backgroundcolor=\color{navy!4}, frame=single, rulecolor=\color{navy!40},
+  showstringspaces=false, breaklines=true, columns=fullflexible, aboveskip=2pt, belowskip=2pt,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1 {ñ}{{\~n}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1 {Ú}{{\'U}}1
+}
+\lstset{style=py}
+
+% ---------- Atajos ----------
+\newcommand{\vect}[1]{\mathbf{#1}}
+\newcommand{\Jac}{\mathbf{J}}
+\newcommand{\dd}{\mathrm{d}}
+
+\title[Newton-Raphson]{El método de Newton-Raphson en una y varias variables}
+\subtitle{Aplicaciones en ingeniería mecánica con Python}
+\author{Whady Felipe Florez}
+\institute[Métodos Numéricos]{Métodos Numéricos --- Ingeniería Mecánica (tercer semestre)}
+\date{\today}
+
+% Diapositiva de contenido al inicio de cada sección
+\AtBeginSection[]{
+  \begin{frame}{Contenido}
+    \tableofcontents[currentsection]
+  \end{frame}
+}
+
+\begin{document}
+
+% =====================================================================
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% =====================================================================
+\section{Motivación y planteamiento}
+
+\begin{frame}{¿Por qué necesitamos resolver ecuaciones no lineales?}
+  En ingeniería mecánica muchas ecuaciones \alert{no se pueden despejar} de forma cerrada:
+  \medskip
+  \begin{center}
+  \footnotesize
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\centering\arraybackslash}p{0.50\textwidth}>{\raggedright\arraybackslash}p{0.17\textwidth}@{}}
+    \toprule
+    \textbf{Problema} & \textbf{Ecuación a resolver} & \textbf{Área} \\
+    \midrule
+    Factor de fricción en tuberías & $\dfrac{1}{\sqrt f}+2\log_{10}\!\left(\dfrac{\varepsilon/D}{3.7}+\dfrac{2.51}{Re\sqrt f}\right)=0$ & Mecánica de fluidos \\[2.5ex]
+    Frecuencias de una viga en voladizo & $1+\cos\lambda\,\cosh\lambda=0$ & Vibraciones \\[1.5ex]
+    Posición de un mecanismo de cuatro barras & $r_2e^{i\theta_2}+r_3e^{i\theta_3}=r_1+r_4e^{i\theta_4}$ & Cinemática de máquinas \\[1.5ex]
+    Temperaturas en una aleta con radiación & $kA\,T''-hP\,(T-T_\infty)-\varepsilon\sigma P\,(T^4-T_{sur}^4)=0$ & Transferencia de calor \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \medskip
+  Hoy aprenderemos \alert{una sola idea} que resuelve las cuatro: el método de Newton-Raphson.
+\end{frame}
+
+\begin{frame}{Objetivos de aprendizaje}
+  Al terminar la clase, usted podrá:
+  \begin{itemize}
+    \item Deducir el método de Newton-Raphson a partir de la serie de Taylor y explicarlo geométricamente.
+    \item Implementarlo en Python para \textbf{una} ecuación y para \textbf{sistemas} de ecuaciones (matriz Jacobiana).
+    \item Reconocer su \alert{convergencia cuadrática} y verificarla numéricamente.
+    \item Identificar cuándo \alert{falla} (semilla mala, $f'(x)=0$, raíces múltiples, Jacobiana singular).
+    \item Aplicarlo a cuatro problemas de ingeniería mecánica y comparar con \texttt{scipy.optimize}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{El problema: encontrar raíces}
+  \begin{block}{Planteamiento}
+    Dada $f:\mathbb{R}\to\mathbb{R}$, encontrar $x^*$ tal que $f(x^*)=0$.
+    \quad (Para sistemas: dada $\vect F:\mathbb{R}^n\to\mathbb{R}^n$, encontrar $\vect x^*$ tal que $\vect F(\vect x^*)=\vect 0$.)
+  \end{block}
+  \medskip
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Métodos cerrados} (con intervalo)
+      \begin{itemize}
+        \item Bisección, falsa posición
+        \item Siempre convergen si hay cambio de signo
+        \item Convergencia \alert{lenta} (lineal)
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Métodos abiertos} (con semilla)
+      \begin{itemize}
+        \item Newton-Raphson, secante
+        \item Convergencia \alert{muy rápida}
+        \item Pueden fallar: dependen de la semilla $x_0$
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% =====================================================================
+\section{Newton-Raphson en una variable}
+
+\begin{frame}{Idea geométrica: seguir la tangente}
+  \begin{columns}[c]
+    \begin{column}{0.52\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig01_tangentes.png}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{enumerate}
+        \item Parta de una semilla $x_k$.
+        \item Trace la \alert{recta tangente} a $f$ en $(x_k,f(x_k))$.
+        \item Donde la tangente corta el eje $x$ está la nueva aproximación $x_{k+1}$.
+      \end{enumerate}
+      \begin{block}{Fórmula de iteración}
+        \[
+          x_{k+1}=x_k-\frac{f(x_k)}{f'(x_k)}
+        \]
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Deducción con la serie de Taylor}
+  Aproximamos $f$ cerca de $x_k$ por su polinomio de Taylor de primer orden:
+  \[
+    f(x)\approx f(x_k)+f'(x_k)\,(x-x_k).
+  \]
+  Buscamos el punto donde esta aproximación lineal se anula:
+  \[
+    0=f(x_k)+f'(x_k)(x_{k+1}-x_k)
+    \quad\Longrightarrow\quad
+    \boxed{x_{k+1}=x_k-\frac{f(x_k)}{f'(x_k)}}
+  \]
+  \begin{alertblock}{Condición necesaria}
+    Se requiere $f'(x_k)\neq 0$. Si $f'(x_k)$ es muy pequeña, el paso $\Delta x=-f/f'$ se vuelve enorme.
+  \end{alertblock}
+  \begin{block}{Interpretación}
+    Newton reemplaza, en cada paso, un problema \emph{no lineal} difícil por un problema \emph{lineal} fácil.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Algoritmo y criterios de parada}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Algoritmo}
+        \begin{enumerate}
+          \item Elegir $x_0$, tolerancia, $k_{\max}$.
+          \item Para $k=0,1,2,\dots$
+          \begin{enumerate}
+            \item $\Delta x_k=-f(x_k)/f'(x_k)$
+            \item $x_{k+1}=x_k+\Delta x_k$
+            \item Si se cumple el criterio de parada: terminar.
+          \end{enumerate}
+          \item Si $k>k_{\max}$: reportar \alert{no convergencia}.
+        \end{enumerate}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Criterios de parada (use más de uno)}
+      \begin{itemize}
+        \item Paso pequeño: $|\Delta x_k|<\text{tol}\cdot\max(1,|x_{k+1}|)$
+        \item Residuo pequeño: $|f(x_{k+1})|<\text{tol}_f$
+        \item Máximo de iteraciones $k_{\max}$
+      \end{itemize}
+      \medskip
+      \alert{Cuidado:} un residuo pequeño no garantiza un error pequeño si $|f'|$ es muy pequeña (y viceversa).
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Implementación mínima en Python}
+\begin{lstlisting}
+def newton_1d(f, df, x0, tol=1e-12, maxit=50):
+    x = float(x0)
+    hist = [x]                          # guardamos todos los iterados
+    for k in range(maxit):
+        dx = -f(x) / df(x)              # paso de Newton
+        x = x + dx
+        hist.append(x)
+        if abs(dx) < tol * max(1.0, abs(x)):
+            break                       # criterio de parada
+    return x, hist
+\end{lstlisting}
+  \begin{itemize}
+    \item Recibe la función \texttt{f} \textbf{y su derivada} \texttt{df}.
+    \item Devuelve la raíz y el \emph{historial} de iterados (para graficar la convergencia).
+    \item El mismo código servirá en todos los ejemplos de ingeniería de hoy.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo de calentamiento: $f(x)=x^2-2$, $x_0=1$}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \centering
+      \begin{tabular}{@{}cll@{}}
+        \toprule
+        $k$ & $x_k$ & $|x_k-\sqrt2|$ \\
+        \midrule
+        0 & 1.000000000000000 & $4.1\times10^{-1}$ \\
+        1 & 1.500000000000000 & $8.6\times10^{-2}$ \\
+        2 & 1.416666666666667 & $2.5\times10^{-3}$ \\
+        3 & 1.414215686274510 & $2.1\times10^{-6}$ \\
+        4 & 1.414213562374690 & $1.6\times10^{-12}$ \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      Aquí $x_{k+1}=\dfrac12\left(x_k+\dfrac{2}{x_k}\right)$ (método de Herón).
+      \medskip
+      \begin{block}{Observe}
+        El número de dígitos correctos \alert{se duplica} aproximadamente en cada iteración: $\;1\to2\to5\to11\to\cdots$
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Convergencia cuadrática}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Teorema (convergencia local)}
+        Si $f\in C^2$, $f(x^*)=0$ y $f'(x^*)\neq0$, existe $\delta>0$ tal que para $|x_0-x^*|<\delta$ Newton converge y
+        \[
+          \lim_{k\to\infty}\frac{|e_{k+1}|}{|e_k|^2}=\left|\frac{f''(x^*)}{2f'(x^*)}\right|,
+          \qquad e_k=x_k-x^*.
+        \]
+      \end{block}
+      \small
+      Verificación numérica: la pendiente de $\log|e_{k+1}|$ vs.\ $\log|e_k|$ es $\approx 2$.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig01b_orden_convergencia.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------- Ejemplo 1: Colebrook ----------
+\begin{frame}{Ejemplo 1 (Mecánica de fluidos): factor de fricción de Colebrook}
+  Pérdida de carga en una tubería: $\Delta P=f\,\dfrac{L}{D}\,\dfrac{\rho V^2}{2}$. El factor $f$ está \alert{implícito}:
+  \[
+    \frac{1}{\sqrt f}=-2\log_{10}\!\left(\frac{\varepsilon/D}{3.7}+\frac{2.51}{Re\sqrt f}\right)
+  \]
+  \textbf{Cambio de variable} $x=1/\sqrt f$ (hace la ecuación casi lineal):
+  \[
+    F(x)=x+2\log_{10}\!\left(\frac{\varepsilon/D}{3.7}+\frac{2.51\,x}{Re}\right)=0,
+    \qquad
+    F'(x)=1+\frac{2}{\ln 10}\,\frac{2.51/Re}{\dfrac{\varepsilon/D}{3.7}+\dfrac{2.51\,x}{Re}}.
+  \]
+  \begin{block}{Datos}
+    Agua en tubería de acero comercial: $D=50$ mm, $\varepsilon=0.045$ mm, $Re=10^5$, $L=100$ m, $\rho=998$ kg/m$^3$.
+    \;Semilla: fórmula explícita de Haaland, $x_0=-1.8\log_{10}\!\left[\left(\tfrac{\varepsilon/D}{3.7}\right)^{1.11}+\tfrac{6.9}{Re}\right]$.
+  \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Ejemplo 1: código en Python}
+\begin{lstlisting}
+import numpy as np
+D, eps, Re = 0.050, 0.045e-3, 1.0e5         # m, m, adimensional
+rr = eps / D                                # rugosidad relativa
+
+F  = lambda x: x + 2*np.log10(rr/3.7 + 2.51*x/Re)
+dF = lambda x: 1 + (2/np.log(10)) * (2.51/Re) / (rr/3.7 + 2.51*x/Re)
+
+x0 = -1.8*np.log10((rr/3.7)**1.11 + 6.9/Re) # semilla de Haaland
+x, hist = newton_1d(F, dF, x0)              # funcion de la diapositiva anterior
+f = 1 / x**2                                # factor de friccion de Darcy
+
+V  = Re*1.0e-3/(998*D)                      # velocidad [m/s]  (mu = 1e-3 Pa s)
+dP = f * (100/D) * 998 * V**2 / 2           # caida de presion en 100 m [Pa]
+\end{lstlisting}
+  \begin{itemize}
+    \item Solo cambian \texttt{F}, \texttt{dF} y \texttt{x0}: el algoritmo es el mismo.
+    \item Resultado: $f=0.021832$, \; $V=2.00$ m/s, \; $\Delta P\approx 87.5$ kPa en 100 m.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo 1: resultados}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \small
+      \begin{tabular}{@{}clll@{}}
+        \toprule
+        $k$ & $x_k=1/\sqrt{f_k}$ & $f_k$ & $|F(x_k)|$ \\
+        \midrule
+        0 & 6.8019806 & 0.021614 & $3.6\times10^{-2}$ \\
+        1 & 6.7678533 & 0.021832 & $1.9\times10^{-6}$ \\
+        2 & 6.7678551 & 0.021832 & $4.4\times10^{-15}$ \\
+        \bottomrule
+      \end{tabular}
+      \medskip
+
+      \textbf{Comparación de métodos} (misma tolerancia):
+      \smallskip
+
+      \footnotesize
+      \begin{tabular}{@{}lc@{}}
+        \toprule
+        Método & Iteraciones \\
+        \midrule
+        Newton (semilla Haaland) & 3 \\
+        Newton ($f_0=0.5$, semilla mala) & 5 \\
+        Secante (\texttt{scipy.optimize.newton}) & 4 \\
+        \texttt{brentq} (intervalo $[3,12]$) & 5 \\
+        Bisección (intervalo $[3,12]$) & 47 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig02b_convergencia.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Ejemplo 1: Newton genera el diagrama de Moody}
+  \begin{columns}[c]
+    \begin{column}{0.52\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig02_moody.png}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      Repetimos Newton para $80$ valores de $Re$ entre $10^4$ y $10^7$ y para cinco rugosidades relativas $\varepsilon/D$ entre $0$ y $0.02$.
+      \medskip
+
+      \begin{block}{Resultado}
+        Con la semilla de Haaland, Newton necesitó \alert{como máximo 3 iteraciones} en los $400$ casos (tolerancia relativa $10^{-12}$ en el paso).
+      \end{block}
+      \small Una fórmula explícita aproximada (Haaland) como semilla $+$ Newton para pulir: patrón muy común en ingeniería.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Ejemplo 1: la elección de la variable importa}
+  Si aplicamos Newton directamente sobre $f$ (en vez de $x=1/\sqrt f$):
+  \begin{center}
+  \begin{tabular}{@{}ccl@{}}
+    \toprule
+    Semilla $f_0$ & Iteraciones & Resultado \\
+    \midrule
+    0.001 & 9 & converge a $f=0.021832$ \\
+    0.02 & 5 & converge a $f=0.021832$ \\
+    0.05 & --- & \alert{falla}: un iterado cae en $f<0$ y $\sqrt f$ no existe \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \begin{block}{Lección}
+    Newton funciona mejor cuando la función es \emph{casi lineal} cerca de la raíz. Un buen cambio de variable puede ser la diferencia entre converger o fallar.
+  \end{block}
+\end{frame}
+
+% ---------- Ejemplo 2: viga ----------
+\begin{frame}{Ejemplo 2 (Vibraciones): frecuencias de una viga en voladizo}
+  Viga de Euler-Bernoulli empotrada-libre: las frecuencias naturales salen de la ecuación característica
+  \[
+    1+\cos\lambda\,\cosh\lambda=0,\qquad \lambda_n=\beta_nL,\qquad
+    \omega_n=\lambda_n^2\sqrt{\frac{EI}{\rho A L^4}}.
+  \]
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig03_viga_raices.png}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      \textbf{Datos (acero):} $E=200$ GPa, $\rho=7850$ kg/m$^3$, $L=0.5$ m, sección $b\times h=20\times5$ mm
+      $\Rightarrow I=bh^3/12=2.083\times10^{-10}$ m$^4$, $A=1.0\times10^{-4}$ m$^2$.
+      \medskip
+
+      \textbf{Forma escalada} (evita el desbordamiento de $\cosh$): dividimos entre $\cosh\lambda$,
+      \[
+        g(\lambda)=\cos\lambda+\frac{1}{\cosh\lambda},\quad
+        g'(\lambda)=-\sin\lambda-\frac{\tanh\lambda}{\cosh\lambda}.
+      \]
+      Hay \alert{infinitas raíces}: ¿a cuál converge Newton?
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Ejemplo 2: código y resultados}
+\begin{lstlisting}
+g  = lambda l: np.cos(l) + 1/np.cosh(l)
+dg = lambda l: -np.sin(l) - np.tanh(l)/np.cosh(l)
+
+E, rho, L, b, h = 200e9, 7850.0, 0.5, 0.02, 0.005
+I, A = b*h**3/12, b*h
+for l0 in [2.0, 4.7, 7.9]:                  # semillas cerca de cada raiz
+    lam, _ = newton_1d(g, dg, l0)
+    w = lam**2 * np.sqrt(E*I/(rho*A*L**4))  # frecuencia natural [rad/s]
+    print(lam, w, w/(2*np.pi))
+\end{lstlisting}
+  \begin{center}
+  \small
+  \begin{tabular}{@{}cccc@{}}
+    \toprule
+    Modo & $\lambda_n$ & $\omega_n$ [rad/s] & $f_n$ [Hz] \\
+    \midrule
+    1 & 1.8751 & 102.46 & 16.31 \\
+    2 & 4.6941 & 642.13 & 102.20 \\
+    3 & 7.8548 & 1797.98 & 286.16 \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  Las raíces de referencia se verificaron con \texttt{scipy.optimize.brentq}.
+\end{frame}
+
+\begin{frame}{Ejemplo 2: la semilla decide a qué raíz converge Newton}
+  \begin{columns}[c]
+    \begin{column}{0.52\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig03b_cuencas.png}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \small
+      \begin{tabular}{@{}ccc@{}}
+        \toprule
+        $\lambda_0$ & Raíz & Iter. \\
+        \midrule
+        1.0 & 1.8751 & 5 \\
+        2.0 & 1.8751 & 5 \\
+        3.0 & $-1.8751$ & 7 \\
+        4.0 & 4.6941 & 5 \\
+        5.0 & 4.6941 & 4 \\
+        6.5 & 10.9955 & 4 \\
+        8.0 & 7.8548 & 4 \\
+        \bottomrule
+      \end{tabular}
+      \medskip
+
+      \alert{Moraleja:} Newton siempre converge a \emph{alguna} raíz cercana, pero no necesariamente a la que usted quiere (aquí, $\lambda_0=3$ lleva a una raíz negativa sin sentido físico y $\lambda_0=6.5$ salta hasta la cuarta raíz). Use la \textbf{gráfica} para elegir semillas.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------- Fallas ----------
+\begin{frame}{¿Cuándo falla Newton? Tres casos clásicos}
+  \centering
+  \includegraphics[width=0.97\textwidth]{figs/fig04_fallas.png}
+  \medskip
+
+  \begin{columns}[T]
+    \begin{column}{0.32\textwidth}
+      \small \textbf{(a) Ciclo.} $f=x^3-2x+2$, $x_0=0$: los iterados alternan $0,1,0,1,\dots$ para siempre.
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \small \textbf{(b) Divergencia.} $f=\arctan x$ converge si $|x_0|<1.39$; con $x_0=1.5$ los iterados \emph{se alejan} de la raíz.
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \small \textbf{(c) Raíz múltiple.} $f'(x^*)=0$: la convergencia se vuelve \alert{lineal}, con factor $\tfrac{m-1}{m}$.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Raíces múltiples y Newton modificado}
+  Para $f(x)=(x-1)^2(x+2)$ (raíz doble en $x^*=1$), con $x_0=2$:
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \small
+      \begin{tabular}{@{}cccc@{}}
+        \toprule
+        $k$ & $|e_k|$ clásico & $e_{k+1}/e_k$ & $|e_k|$ modificado \\
+        \midrule
+        0 & 1.0 & 0.556 & 1.0 \\
+        1 & 0.556 & 0.536 & $1.1\times10^{-1}$ \\
+        2 & 0.298 & 0.522 & $1.9\times10^{-3}$ \\
+        3 & 0.155 & 0.512 & $6.3\times10^{-7}$ \\
+        4 & 0.080 & 0.506 & $6.7\times10^{-14}$ \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Newton modificado (multiplicidad $m$ conocida)}
+        \[
+          x_{k+1}=x_k-m\,\frac{f(x_k)}{f'(x_k)}
+        \]
+        Recupera la convergencia \alert{cuadrática}.
+      \end{block}
+      \small Con Newton clásico el error se reduce a la mitad por iteración ($m=2$): necesita $\sim30$ iteraciones para $10^{-9}$.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Variantes cuando la derivada es incómoda o costosa}
+  \begin{center}
+  \footnotesize
+  \begin{tabular}{@{}lcccp{0.27\textwidth}@{}}
+    \toprule
+    Método & Usa $f'$ & Orden & Evaluaciones/iter. & Requiere \\
+    \midrule
+    Bisección & No & 1 (factor $\tfrac12$) & 1 $f$ & intervalo con cambio de signo \\
+    Secante & No & $\approx1.618$ & 1 $f$ & dos semillas \\
+    Newton-Raphson & Sí & 2 & 1 $f$ + 1 $f'$ & semilla, $f'\neq0$ \\
+    Newton modificado & Sí & 2 (raíz múltiple) & 1 $f$ + 1 $f'$ & multiplicidad $m$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \begin{block}{Secante: reemplaza $f'(x_k)$ por una pendiente numérica}
+    \[
+      x_{k+1}=x_k-f(x_k)\,\frac{x_k-x_{k-1}}{f(x_k)-f(x_{k-1})}
+    \]
+  \end{block}
+  \textbf{Práctica profesional:} combinar un método cerrado (robusto) con uno abierto (rápido), como hace \texttt{scipy.optimize.brentq}. En \texttt{scipy.optimize.newton}, si no se da \texttt{fprime}, se usa la secante.
+\end{frame}
+
+\begin{frame}{Síntesis: Newton-Raphson en una variable}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Ventajas}
+      \begin{itemize}
+        \item Convergencia \alert{cuadrática} cerca de la raíz simple.
+        \item Muy pocas iteraciones (3--6 en nuestros ejemplos).
+        \item Una fórmula, fácil de programar.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Limitaciones}
+      \begin{itemize}
+        \item Necesita $f'$ y una \alert{buena semilla}.
+        \item Puede ciclar, divergir o ir a otra raíz.
+        \item Raíz múltiple $\Rightarrow$ convergencia lineal.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \bigskip
+  \begin{block}{Recomendaciones prácticas}
+    \begin{enumerate}
+      \item Grafique $f$ antes de elegir la semilla.
+      \item Considere un cambio de variable que linealice el problema.
+      \item Controle $k_{\max}$ y verifique $|f(x_k)|$ y $|\Delta x_k|$.
+      \item Si Newton es inestable, use un método híbrido (\texttt{brentq}).
+    \end{enumerate}
+  \end{block}
+\end{frame}
+
+% =====================================================================
+\section{Newton-Raphson para sistemas}
+
+\begin{frame}{De una ecuación a $n$ ecuaciones}
+  Sistema de $n$ ecuaciones no lineales con $n$ incógnitas:
+  \[
+    \vect F(\vect x)=\begin{pmatrix}F_1(x_1,\dots,x_n)\\ \vdots\\ F_n(x_1,\dots,x_n)\end{pmatrix}=\vect 0,
+    \qquad \vect x=\begin{pmatrix}x_1\\ \vdots\\ x_n\end{pmatrix}.
+  \]
+  \begin{block}{Matriz Jacobiana}
+    \[
+      \Jac(\vect x)=\begin{pmatrix}
+        \dfrac{\partial F_1}{\partial x_1} & \cdots & \dfrac{\partial F_1}{\partial x_n}\\
+        \vdots & \ddots & \vdots\\
+        \dfrac{\partial F_n}{\partial x_1} & \cdots & \dfrac{\partial F_n}{\partial x_n}
+      \end{pmatrix}
+    \]
+  \end{block}
+  La Jacobiana es la \alert{generalización de $f'(x)$}: describe cómo cambia $\vect F$ al mover cada incógnita.
+\end{frame}
+
+\begin{frame}{Deducción: Taylor multivariable}
+  Aproximación lineal de $\vect F$ alrededor de $\vect x_k$:
+  \[
+    \vect F(\vect x)\approx \vect F(\vect x_k)+\Jac(\vect x_k)\,(\vect x-\vect x_k).
+  \]
+  Igualando a cero en $\vect x=\vect x_{k+1}$ y llamando $\Delta\vect x_k=\vect x_{k+1}-\vect x_k$:
+  \[
+    \boxed{\;\Jac(\vect x_k)\,\Delta\vect x_k=-\vect F(\vect x_k),\qquad \vect x_{k+1}=\vect x_k+\Delta\vect x_k\;}
+  \]
+  \begin{alertblock}{Importante: no se invierte $\Jac$}
+    En la práctica se \emph{resuelve} el sistema lineal $n\times n$ en cada iteración (\texttt{np.linalg.solve}). Calcular $\Jac^{-1}$ explícitamente es más costoso y menos preciso.
+  \end{alertblock}
+  \begin{block}{Comparación}
+    \small $n=1$: $\;f'(x_k)\,\Delta x=-f(x_k)\;\Rightarrow\; \Delta x=-f/f'$ \quad (el caso que ya conocemos).
+  \end{block}
+\end{frame}
+
+\begin{frame}{Algoritmo y criterios de parada}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \begin{block}{Algoritmo}
+        \begin{enumerate}
+          \item Elegir $\vect x_0$, tolerancia, $k_{\max}$.
+          \item Para $k=0,1,\dots$
+          \begin{enumerate}
+            \item Evaluar $\vect F(\vect x_k)$ y $\Jac(\vect x_k)$.
+            \item Resolver $\Jac\,\Delta\vect x=-\vect F$.
+            \item $\vect x_{k+1}=\vect x_k+\Delta\vect x$.
+            \item Parar si $\|\Delta\vect x\|$ (o $\|\vect F\|$) es pequeña.
+          \end{enumerate}
+        \end{enumerate}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Criterios con normas}
+      \begin{itemize}
+        \item $\|\Delta\vect x_k\|_2<\text{tol}\cdot\max(1,\|\vect x_{k+1}\|_2)$
+        \item $\|\vect F(\vect x_{k+1})\|_2<\text{tol}_F$
+      \end{itemize}
+      \medskip
+      \alert{Cuidado con las unidades:} si las incógnitas o las ecuaciones tienen unidades distintas (ángulos y longitudes, K y W), considere \emph{escalar} antes de comparar normas.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{Implementación en Python}
+\begin{lstlisting}
+def newton_nd(F, J, x0, tol=1e-12, maxit=50):
+    x = np.array(x0, dtype=float)
+    hist = [x.copy()]
+    for k in range(maxit):
+        dx = np.linalg.solve(J(x), -F(x))   # resolver J dx = -F  (sin invertir J)
+        x = x + dx
+        hist.append(x.copy())
+        if np.linalg.norm(dx) < tol * max(1.0, np.linalg.norm(x)):
+            break
+    return x, np.array(hist)
+\end{lstlisting}
+  \begin{itemize}
+    \item \texttt{F(x)} devuelve un vector de tamaño $n$; \texttt{J(x)} devuelve una matriz $n\times n$.
+    \item Es el mismo esqueleto que \texttt{newton\_1d}: solo cambia la división por \texttt{solve}.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo a mano: intersección circunferencia--parábola}
+  \small
+  \[
+    F_1=x^2+y^2-4=0,\qquad F_2=y-x^2=0,\qquad
+    \Jac=\begin{pmatrix}2x&2y\\-2x&1\end{pmatrix},\qquad \vect x_0=(1,1)^T.
+  \]
+  \textbf{Primera iteración:} $\vect F(\vect x_0)=(-2,\,0)^T$, \; $\Jac(\vect x_0)=\begin{pmatrix}2&2\\-2&1\end{pmatrix}$. Resolver $\Jac\,\Delta\vect x=-\vect F=(2,\,0)^T$:
+  \[
+    2a+2b=2,\;\; -2a+b=0 \;\Rightarrow\; a=\tfrac13,\; b=\tfrac23
+    \;\Rightarrow\; \vect x_1=\left(\tfrac43,\,\tfrac53\right)^T\approx(1.3333,\,1.6667)^T.
+  \]
+  \begin{center}
+  \footnotesize
+  \begin{tabular}{@{}cccc@{}}
+    \toprule
+    $k$ & $x_k$ & $y_k$ & $\|\vect F(\vect x_k)\|$ \\
+    \midrule
+    0 & 1.00000 & 1.00000 & 2.0 \\
+    1 & 1.33333 & 1.66667 & $5.7\times10^{-1}$ \\
+    2 & 1.25321 & 1.56410 & $1.8\times10^{-2}$ \\
+    3 & 1.24963 & 1.56155 & $2.3\times10^{-5}$ \\
+    4 & 1.24962 & 1.56155 & $4.9\times10^{-11}$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  {\small Solución exacta: $y=\frac{-1+\sqrt{17}}{2}=1.56155$, \; $x=\sqrt y=1.24962$.}
+\end{frame}
+
+% ---------- Ejemplo 3: cuatro barras ----------
+\begin{frame}{Ejemplo 3 (Mecanismos): cuatro barras --- análisis de posición}
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig05_mecanismo.png}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \small
+      Dado el ángulo de la manivela $\theta_2$, hallar $\theta_3$ (acoplador) y $\theta_4$ (balancín). Cierre del lazo vectorial:
+      \begin{align*}
+        F_1&=r_2\cos\theta_2+r_3\cos\theta_3-r_4\cos\theta_4-r_1=0\\
+        F_2&=r_2\sin\theta_2+r_3\sin\theta_3-r_4\sin\theta_4=0
+      \end{align*}
+      \textbf{Datos:} $r_1=0.30$, $r_2=0.10$, $r_3=0.25$, $r_4=0.20$ m. Grashof: $s+l=0.40<p+q=0.45$ (manivela-balancín).
+    \end{column}
+  \end{columns}
+  \medskip
+  \[
+    \Jac=\begin{pmatrix}-r_3\sin\theta_3 & r_4\sin\theta_4\\ r_3\cos\theta_3 & -r_4\cos\theta_4\end{pmatrix},
+    \qquad \det\Jac=r_3r_4\sin(\theta_3-\theta_4).
+  \]
+  \alert{Si $\theta_3=\theta_4$ (barras alineadas), $\Jac$ es singular}: es una posición de singularidad del mecanismo.
+\end{frame}
+
+\begin{frame}[fragile]{Ejemplo 3: código en Python}
+\begin{lstlisting}
+r1, r2, r3, r4 = 0.30, 0.10, 0.25, 0.20          # m
+
+def make_system(th2):
+    def F(u):
+        th3, th4 = u
+        return np.array([r2*np.cos(th2) + r3*np.cos(th3) - r4*np.cos(th4) - r1,
+                         r2*np.sin(th2) + r3*np.sin(th3) - r4*np.sin(th4)])
+    def J(u):
+        th3, th4 = u
+        return np.array([[-r3*np.sin(th3),  r4*np.sin(th4)],
+                         [ r3*np.cos(th3), -r4*np.cos(th4)]])
+    return F, J
+
+F, J = make_system(np.radians(60))
+u0 = np.radians([20.0, 90.0])                    # semilla [th3, th4] (rad)
+u, hist = newton_nd(F, J, u0)
+print(np.degrees(u))                             # -> [26.5278  97.5622]
+\end{lstlisting}
+  Los ángulos se trabajan en \alert{radianes} dentro del código y se convierten a grados solo para imprimir.
+\end{frame}
+
+\begin{frame}{Ejemplo 3: resultados para $\theta_2=60^\circ$}
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \small
+      \begin{tabular}{@{}cccc@{}}
+        \toprule
+        $k$ & $\theta_3$ [$^\circ$] & $\theta_4$ [$^\circ$] & $\|\vect F\|$ \\
+        \midrule
+        0 & 20.0000 & 90.0000 & $3.2\times10^{-2}$ \\
+        1 & 26.8027 & 97.2275 & $1.9\times10^{-3}$ \\
+        2 & 26.5284 & 97.5617 & $3.6\times10^{-6}$ \\
+        3 & 26.5278 & 97.5622 & $1.3\times10^{-11}$ \\
+        \bottomrule
+      \end{tabular}
+      \medskip
+
+      \textbf{Comparación:} \texttt{scipy.optimize.fsolve} con la misma Jacobiana obtiene $\theta_3=26.5278^\circ$, $\theta_4=97.5622^\circ$.
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{Dos ensambles, dos soluciones}
+        Con la semilla $(-20^\circ,-90^\circ)$ Newton converge a $\theta_3=-64.7410^\circ$, $\theta_4=-135.7754^\circ$: la configuración \emph{cruzada} del mismo mecanismo.
+      \end{block}
+      \small La semilla elige el \alert{ensamble} del mecanismo. Para cada $\theta_2$ hay dos soluciones geométricamente válidas.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Ejemplo 3: barrido de la manivela con continuación}
+  \centering
+  \includegraphics[width=0.92\textwidth]{figs/fig05b_barrido.png}
+  \medskip
+
+  \small
+  \textbf{Continuación:} para cada nuevo $\theta_2$ (paso de $2^\circ$) se usa como semilla la solución del ángulo anterior. Resultado: \alert{4 iteraciones en promedio} por posición, y se sigue la misma rama durante toda la vuelta. El balancín oscila entre $\theta_4=93.6^\circ$ y $153.6^\circ$.
+\end{frame}
+
+% ---------- Ejemplo 4: aleta ----------
+\begin{frame}{Ejemplo 4 (Transferencia de calor): aleta con convección y radiación}
+  Aleta cilíndrica de acero: $k=50$ W/m\,K, $D=10$ mm, $L=150$ mm, base a $T_0=600$ K, $h=15$ W/m$^2$K, $\varepsilon=0.8$, $T_\infty=T_{sur}=300$ K. Discretizamos con $n=3$ nodos ($\Delta x=50$ mm) \textit{(modelo grueso, con fines didácticos)}.
+  \small
+  \begin{align*}
+    F_i&=\frac{kA}{\Delta x}(T_{i-1}-2T_i+T_{i+1})-hP\Delta x\,(T_i-T_\infty)-\varepsilon\sigma P\Delta x\,(T_i^4-T_{sur}^4)=0,\quad i=1,2\\
+    F_3&=\frac{kA}{\Delta x}(T_2-T_3)-\left(\tfrac{P\Delta x}{2}+A\right)\left[h(T_3-T_\infty)+\varepsilon\sigma(T_3^4-T_{sur}^4)\right]=0
+  \end{align*}
+  Jacobiana \alert{tridiagonal} (cada nodo solo depende de sus vecinos):
+  \[
+    \frac{\partial F_i}{\partial T_i}=-\frac{2kA}{\Delta x}-hP\Delta x-4\varepsilon\sigma P\Delta x\,T_i^3,\qquad
+    \frac{\partial F_i}{\partial T_{i\pm1}}=\frac{kA}{\Delta x}
+  \]
+  (el nodo 3 usa $-\frac{kA}{\Delta x}-(\frac{P\Delta x}{2}+A)(h+4\varepsilon\sigma T_3^3)$ en la diagonal). Aquí $P=\pi D$, $A=\pi D^2/4$.
+\end{frame}
+
+\begin{frame}[fragile]{Ejemplo 4: código y semilla}
+\begin{lstlisting}
+sigma = 5.670e-8
+k, D, L, h, eps, Tinf, T0 = 50.0, 0.010, 0.15, 15.0, 0.8, 300.0, 600.0
+dx = L/3; P = np.pi*D; Ac = np.pi*D**2/4; kA = k*Ac/dx
+
+def F(T):
+    T1, T2, T3 = T
+    w3 = P*dx/2 + Ac
+    return np.array([
+        kA*(T0-2*T1+T2) - h*P*dx*(T1-Tinf) - eps*sigma*P*dx*(T1**4-Tinf**4),
+        kA*(T1-2*T2+T3) - h*P*dx*(T2-Tinf) - eps*sigma*P*dx*(T2**4-Tinf**4),
+        kA*(T2-T3)      - w3*(h*(T3-Tinf) + eps*sigma*(T3**4-Tinf**4))])
+
+def J(T):                                   # Jacobiana tridiagonal
+    w3 = P*dx/2 + Ac
+    d = lambda Ti, w: -2*kA - h*w - 4*eps*sigma*w*Ti**3
+    return np.array([[d(T[0], P*dx), kA, 0],
+                     [kA, d(T[1], P*dx), kA],
+                     [0, kA, -kA - w3*(h + 4*eps*sigma*T[2]**3)]])
+
+T, hist = newton_nd(F, J, np.full(3, T0))   # semilla: todos a la temperatura de la base
+\end{lstlisting}
+\end{frame}
+
+\begin{frame}{Ejemplo 4: resultados}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \footnotesize
+      \begin{tabular}{@{}cccc@{}}
+        \toprule
+        $k$ & $T_1$ [K] & $T_2$ [K] & $T_3$ [K] \\
+        \midrule
+        0 & 600.000 & 600.000 & 600.000 \\
+        1 & 484.274 & 443.345 & 432.856 \\
+        2 & 459.114 & 398.141 & 380.017 \\
+        3 & 457.863 & 395.605 & 376.895 \\
+        4 & 457.860 & 395.598 & 376.886 \\
+        \bottomrule
+      \end{tabular}
+      \smallskip
+
+      \small
+      $\|\vect F\|$ cae de $23.9$ a $4.3\times10^{-9}$ W en 4 iteraciones.
+      \begin{itemize}
+        \item La radiación baja las temperaturas $\approx29$--$34$ K respecto a solo convección ($486.76,\,429.55,\,411.20$ K).
+        \item Calor que entra a la aleta: $11.164$ W $=6.968$ W (convección) $+\,4.195$ W (radiación): el \alert{balance de energía} cierra.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.52\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig06_aleta.png}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Jacobiana numérica: cuando derivar a mano es tedioso}
+  Si $\Jac$ es difícil de derivar, se aproxima columna por columna con \alert{diferencias finitas}:
+  \[
+    \Jac_{:,j}\approx\frac{\vect F(\vect x+\delta\,\vect e_j)-\vect F(\vect x)}{\delta},\qquad j=1,\dots,n.
+  \]
+  \begin{columns}[T]
+    \begin{column}{0.5\textwidth}
+      \textbf{Costo:} $n$ evaluaciones extra de $\vect F$ por iteración.\\[1ex]
+      \textbf{Aleta ($\delta=1$ K):}
+      \begin{itemize}
+        \item Diferencia relativa máxima entre $\Jac$ analítica y numérica en la solución: $4.3\times10^{-4}$.
+        \item Newton con $\Jac$ numérica: 7 iteraciones (vs.\ 6 con la analítica).
+        \item Misma solución en todos los dígitos mostrados.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{alertblock}{Ojo}
+        Con $\Jac$ aproximada se pierde un poco la convergencia cuadrática (se vuelve \emph{superlineal}), pero Newton sigue siendo muy eficiente. Es lo que hace \texttt{fsolve} internamente cuando no se le da \texttt{fprime}.
+      \end{alertblock}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Comparación con \texttt{scipy.optimize}}
+  \begin{center}
+  \small
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    Problema & Newton propio & \texttt{fsolve} con $\Jac$ & \texttt{fsolve} sin $\Jac$ \\
+    \midrule
+    Cuatro barras ($\theta_2=60^\circ$) & 5 iter. & 10 eval.\ de $\vect F$ & --- \\
+    Aleta con radiación (3 nodos) & 6 iter. (analítica) / 7 (numérica) & 14 eval.\ de $\vect F$ & 17 eval.\ de $\vect F$ \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  {\scriptsize Iteraciones de Newton contadas hasta $\|\Delta\vect x\|<10^{-13}$; el residuo ya es muy pequeño antes (en la aleta, $4.3\times10^{-9}$ W tras 4 iteraciones).}
+  \smallskip
+  \begin{itemize}
+    \item \texttt{fsolve} y \texttt{root(method='hybr')} usan el método híbrido de Powell (MINPACK): combina pasos de Newton con una región de confianza. Es \alert{más robusto} que Newton puro, a costa de más evaluaciones de $\vect F$.
+    \item Nuestro Newton hace 1 evaluación de $\vect F$ y 1 de $\Jac$ por iteración.
+    \item En la práctica: use \texttt{scipy.optimize.root}; programe Newton usted mismo para \alert{entender} qué hace.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Convergencia cuadrática en los cuatro ejemplos}
+  \begin{columns}[c]
+    \begin{column}{0.58\textwidth}
+      \includegraphics[width=\textwidth]{figs/fig07_convergencia_global.png}
+    \end{column}
+    \begin{column}{0.4\textwidth}
+      \small
+      Estimación numérica del orden $p_k=\dfrac{\ln(e_{k+1}/e_k)}{\ln(e_k/e_{k-1})}$:
+      \smallskip
+
+      \begin{tabular}{@{}lc@{}}
+        \toprule
+        Ejemplo & $p_k$ \\
+        \midrule
+        Colebrook (1 var.) & 2.1, 2.0 \\
+        Viga (1 var.) & 3.2, 1.9, 2.0 \\
+        Cuatro barras (2 var.) & 2.0, 2.0 \\
+        Aleta (3 var.) & 2.0, 2.0, 2.0 \\
+        \bottomrule
+      \end{tabular}
+      \medskip
+
+      Con 1, 2 o 3 variables: el mismo comportamiento \alert{cuadrático}.
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Dificultades en sistemas y remedios}
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \textbf{Problemas típicos}
+      \begin{itemize}
+        \item \alert{Jacobiana singular} o mal condicionada (p.\,ej.\ $\det\Jac=r_3r_4\sin(\theta_3-\theta_4)\to0$ en el mecanismo).
+        \item Semilla lejana: converge a otra solución o diverge.
+        \item Coste de armar y factorizar $\Jac$ en sistemas grandes ($n\sim10^4$ o más).
+        \item Ecuaciones con escalas muy distintas.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \textbf{Remedios}
+      \begin{itemize}
+        \item \textbf{Continuación:} usar la solución anterior como semilla (como en el barrido del mecanismo).
+        \item \textbf{Newton amortiguado:} $\vect x_{k+1}=\vect x_k+\alpha\,\Delta\vect x_k$ con $0<\alpha\le1$ (búsqueda lineal).
+        \item \textbf{Cuasi-Newton} (Broyden): actualiza una aproximación de $\Jac$ sin recalcularla.
+        \item Escalar variables y ecuaciones.
+        \item Aprovechar la \alert{dispersión} de $\Jac$ (matrices ralas).
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% =====================================================================
+\section{Cierre}
+
+\begin{frame}{Resumen: una idea, muchos problemas}
+  \begin{center}
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+     & \textbf{Una variable} & \textbf{Sistema de $n$ variables} \\
+    \midrule
+    Problema & $f(x)=0$ & $\vect F(\vect x)=\vect 0$ \\[0.8ex]
+    ``Derivada'' & $f'(x)$ & $\Jac(\vect x)$ (matriz $n\times n$) \\[0.8ex]
+    Paso & $\Delta x=-f/f'$ & $\Jac\,\Delta\vect x=-\vect F$ \\[0.8ex]
+    Actualización & $x_{k+1}=x_k+\Delta x$ & $\vect x_{k+1}=\vect x_k+\Delta\vect x$ \\[0.8ex]
+    Convergencia & cuadrática (raíz simple) & cuadrática ($\Jac$ no singular) \\[0.8ex]
+    Falla si & $f'(x^*)=0$, semilla mala & $\det\Jac=0$, semilla mala \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \medskip
+  \begin{block}{Idea central}
+    Linealizar, resolver el problema lineal, y repetir. En cada ejemplo de hoy cambió la \emph{física}; el \emph{algoritmo} fue el mismo.
+  \end{block}
+\end{frame}
+
+\begin{frame}{Buenas prácticas}
+  \begin{enumerate}
+    \item \textbf{Entienda el problema antes de programar:} grafique, estime órdenes de magnitud, busque las raíces físicamente razonables.
+    \item \textbf{Elija la semilla con criterio} (fórmula explícita aproximada, solución del paso anterior, gráfica).
+    \item \textbf{Verifique siempre el resultado:} sustituya en la ecuación original, revise el balance físico (por ejemplo, el balance de energía de la aleta).
+    \item \textbf{Registre el historial de iterados} y grafique el error: debe verse la caída cuadrática.
+    \item \textbf{Reporte la no convergencia} en vez de devolver un número sin sentido.
+    \item \textbf{Compare con una herramienta confiable} (\texttt{scipy.optimize}) para validar su implementación.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Ejercicios propuestos}
+  \footnotesize
+  \setlength{\itemsep}{1pt}
+  \begin{enumerate}
+    \item \textbf{Colebrook.} Repita con $Re=10^6$ y $\varepsilon/D=0.002$. Compare Newton sobre $x=1/\sqrt f$ y sobre $f$ para distintas semillas.
+    \item \textbf{Viga.} Calcule las 5 primeras frecuencias de una viga de aluminio. Repita para viga empotrada-empotrada ($\cos\lambda\cosh\lambda=1$).
+    \item \textbf{A mano.} Haga dos iteraciones de Newton para $x^3-2x-5=0$ con $x_0=2$ y compare con el código.
+    \item \textbf{Raíz múltiple.} Estime numéricamente el orden de convergencia para $f(x)=(x-1)^3$ e implemente Newton modificado con $m=3$.
+    \item \textbf{Cuatro barras.} Cambie $r_2=0.20$ m (ya no es Grashof). Encuentre los ángulos de $\theta_2$ en los que $\Jac$ se vuelve singular y observe qué le pasa a Newton.
+    \item \textbf{Aleta.} Generalice el código a $n$ nodos y compare la temperatura de la punta con $n=3,6,12$. Pruebe semillas de 100~K, 1500~K y 3000~K: ¿cuántas iteraciones necesita? ¿Por qué converge aun con semillas lejanas?
+    \item \textbf{Newton amortiguado.} Implemente una búsqueda lineal (reducir $\alpha$ a la mitad hasta que $\|\vect F\|$ disminuya) y pruébela en un problema donde Newton puro falle.
+    \item \textbf{Propio.} Una masa colgada de dos resortes lineales fijos a dos puntos: plantee las ecuaciones de equilibrio en $(x,y)$ con geometría no lineal, derive $\Jac$ y resuelva con Newton.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Referencias}
+  \footnotesize
+  \begin{itemize}
+    \item Chapra, S.\,C., Canale, R.\,P. \emph{Métodos numéricos para ingenieros}. McGraw-Hill.
+    \item Burden, R.\,L., Faires, J.\,D. \emph{Numerical Analysis}. Cengage Learning.
+    \item Kiusalaas, J. \emph{Numerical Methods in Engineering with Python 3}. Cambridge University Press, 2013.
+    \item Nocedal, J., Wright, S.\,J. \emph{Numerical Optimization}. Springer, 2006 (Newton para sistemas, métodos globales).
+    \item Colebrook, C.\,F. (1939). Turbulent flow in pipes, with particular reference to the transition region between the smooth and rough pipe laws. \emph{J. Inst. Civil Eng.}, 11(4), 133--156.
+    \item Haaland, S.\,E. (1983). Simple and explicit formulas for the friction factor in turbulent pipe flow. \emph{J. Fluids Eng.}, 105(1), 89--90.
+    \item Rao, S.\,S. \emph{Mechanical Vibrations}. Pearson.
+    \item Norton, R.\,L. \emph{Design of Machinery}. McGraw-Hill.
+    \item Incropera, F.\,P., DeWitt, D.\,P., Bergman, T.\,L., Lavine, A.\,S. \emph{Fundamentals of Heat and Mass Transfer}. Wiley.
+    \item Virtanen, P.\ et al.\ (2020). SciPy 1.0: fundamental algorithms for scientific computing in Python. \emph{Nature Methods}, 17, 261--272.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \centering
+  \vspace{1.5cm}
+  {\Large\textbf{¿Preguntas?}}\\[1.2cm]
+  \small Código y figuras: carpeta \texttt{scripts/} (ejecute \texttt{python run\_all.py}).
+\end{frame}
+
+\end{document}
