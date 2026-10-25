@@ -1,0 +1,819 @@
+% =====================================================================
+%  Metodos Numericos -- Integracion doble y multiple
+%  Rectangulos (punto medio), trapecios y cuadratura de Gauss-Legendre
+%  Valores numericos verificados con scripts/integracion_multiple.py
+% =====================================================================
+\documentclass[aspectratio=169,10pt]{beamer}
+\usetheme[progressbar=frametitle,block=fill,numbering=fraction,sectionpage=progressbar]{metropolis}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[spanish,es-noshorthands]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\usepackage{siunitx}
+\sisetup{output-decimal-marker={.},per-mode=symbol}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,calc,positioning,patterns}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.17}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+
+% ---------------- Paleta navy / dorado ----------------
+\definecolor{navy}{RGB}{18,38,74}
+\definecolor{navyL}{RGB}{226,232,243}
+\definecolor{gold}{RGB}{196,145,32}
+\definecolor{goldL}{RGB}{252,244,222}
+\definecolor{tealC}{RGB}{0,121,128}
+\definecolor{hot}{RGB}{200,45,35}
+\definecolor{codebg}{RGB}{246,247,250}
+
+\setbeamercolor{frametitle}{bg=navy,fg=white}
+\setbeamercolor{progress bar}{fg=gold,bg=navyL}
+\setbeamercolor{title separator}{fg=gold}
+\setbeamercolor{alerted text}{fg=gold!85!black}
+\setbeamercolor{block title}{bg=navy,fg=white}
+\setbeamercolor{block body}{bg=navyL,fg=black}
+\setbeamercolor{background canvas}{bg=white}
+\setbeamercolor{normal text}{fg=black!88}
+\setbeamerfont{itemize/enumerate body}{size=\small}
+\setlength{\leftmargini}{1.3em}
+
+% ---------------- Cajas ----------------
+\newtcolorbox{pregunta}[1][Pregunta para la clase]{enhanced,colback=goldL,colframe=gold,boxrule=0.9pt,arc=1.5mm,
+  left=6pt,right=6pt,top=4pt,bottom=3pt,before skip=10pt,
+  title={\textbf{#1}},coltitle=white,colbacktitle=gold,
+  fonttitle=\small\sffamily,attach boxed title to top left={xshift=6pt,yshift=-2mm},
+  boxed title style={arc=1mm,boxrule=0pt}}
+\newtcolorbox{clave}{enhanced,colback=navyL,colframe=navy,boxrule=0.8pt,arc=1.5mm,
+  left=6pt,right=6pt,top=2pt,bottom=2pt,before skip=6pt}
+\newcommand{\ideaclave}[1]{\begin{clave}\small\textbf{\textcolor{navy}{Idea clave.}} #1\end{clave}}
+
+% ---------------- Codigo ----------------
+\lstset{language=Python,basicstyle=\ttfamily\scriptsize,backgroundcolor=\color{codebg},
+  keywordstyle=\color{navy}\bfseries,commentstyle=\color{tealC}\itshape,stringstyle=\color{hot},
+  frame=single,rulecolor=\color{navy!30},framerule=0.4pt,xleftmargin=4pt,xrightmargin=4pt,
+  showstringspaces=false,columns=fullflexible,keepspaces=true,aboveskip=2pt,belowskip=2pt}
+
+% ---------------- Portada ----------------
+\title{Integraci\'on doble y m\'ultiple}
+\subtitle{Reglas del rect\'angulo y del trapecio, y cuadratura de Gauss--Legendre}
+\author{Whady Felipe Fl\'orez}
+\institute{M\'etodos Num\'ericos -- Pregrado}
+\date{}
+
+\begin{document}
+\maketitle
+
+% =====================================================================
+\begin{frame}{Objetivos y ruta de la clase (60 min)}
+\begin{columns}[T]
+\begin{column}{0.52\textwidth}
+\textbf{Al terminar la clase, el estudiante podr\'a:}
+\begin{enumerate}
+\item Extender una regla de integraci\'on 1D a 2D y 3D mediante el \alert{producto tensorial}.
+\item Aplicar las reglas del rect\'angulo, del trapecio y de Gauss--Legendre en dominios rectangulares y no rectangulares.
+\item Comparar los m\'etodos por \alert{error} y por \alert{n\'umero de evaluaciones} de la funci\'on.
+\item Reconocer cu\'ando una cuadratura funciona mal y c\'omo corregirlo.
+\end{enumerate}
+\end{column}
+\begin{column}{0.44\textwidth}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+Bloque & min\\
+\midrule
+Motivaci\'on y paso de 1D a 2D & 10\\
+Rect\'angulos y trapecios en 2D & 13\\
+Cuadratura de Gauss--Legendre & 17\\
+Dominios no rectangulares & 7\\
+Integrales triples y dimensi\'on & 5\\
+Python, s\'intesis y ejercicios & 8\\
+\midrule
+\textbf{Total} & \textbf{60}\\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Motivaci\'on: integrales dobles en ingenier\'ia mec\'anica}
+\begin{columns}[T]
+\begin{column}{0.56\textwidth}
+{\small Sobre una regi\'on plana $D$ (placa, secci\'on transversal, compuerta):}
+\[\small
+\begin{aligned}
+\text{Masa:}&\quad m=\iint_D \rho(x,y)\,dA,\qquad \bar x=\frac{1}{m}\iint_D x\,\rho\,dA\\
+\text{Momento polar:}&\quad J=\iint_D (x^2+y^2)\,dA\\
+\text{Fuerza de presi\'on:}&\quad F=\iint_D p(x,y)\,dA
+\end{aligned}
+\]
+{\small En la pr\'actica $\rho$, $p$ o la forma de $D$ impiden una primitiva cerrada, o solo se conocen valores en puntos (sensores, malla de simulaci\'on).}
+\end{column}
+\begin{column}{0.40\textwidth}
+\centering
+\begin{tikzpicture}[font=\scriptsize\sffamily]
+\fill[navyL] (0,0) .. controls (0.2,1.6) and (1.0,2.3) .. (2.2,2.2) .. controls (3.4,2.1) and (3.8,1.0) .. (3.4,0.2) .. controls (2.8,-0.5) and (0.8,-0.4) .. (0,0);
+\draw[navy,thick] (0,0) .. controls (0.2,1.6) and (1.0,2.3) .. (2.2,2.2) .. controls (3.4,2.1) and (3.8,1.0) .. (3.4,0.2) .. controls (2.8,-0.5) and (0.8,-0.4) .. (0,0);
+\fill[gold] (1.9,0.95) rectangle ++(0.25,0.25);
+\draw[-{Stealth}] (2.6,1.6) node[right]{$dA$} -- (2.15,1.15);
+\node[navy] at (1.0,1.6) {$D$};
+\draw[-{Stealth}] (-0.4,-0.6) -- (4.2,-0.6) node[right]{$x$};
+\draw[-{Stealth}] (-0.4,-0.6) -- (-0.4,2.7) node[above]{$y$};
+\node[align=center] at (1.9,-1.15) {$\displaystyle\iint_D f\,dA\approx\sum_k w_k\,f(x_k,y_k)$};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\ideaclave{Toda cuadratura num\'erica es una \alert{suma ponderada} de valores de la funci\'on. Los m\'etodos difieren solo en \emph{d\'onde} se eval\'ua $f$ y con \emph{qu\'e peso}.}
+\end{frame}
+
+% =====================================================================
+\section{De una a dos dimensiones}
+% =====================================================================
+\begin{frame}{Repaso 1D: rect\'angulo (punto medio) y trapecio}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\small Con $n$ subintervalos, $h=(b-a)/n$:
+\[
+\int_a^b f\,dx\approx M_n=h\sum_{i=1}^{n} f\big(\tfrac{x_{i-1}+x_i}{2}\big)
+\]
+\[
+\int_a^b f\,dx\approx T_n=\frac h2\Big[f_0+2\sum_{i=1}^{n-1}f_i+f_n\Big]
+\]
+Errores (compuestos):
+\[
+I-M_n\approx+\frac{(b-a)h^2}{24}\bar f'',\qquad I-T_n\approx-\frac{(b-a)h^2}{12}\bar f''
+\]
+Ambos son de orden $O(h^2)$, y el error del rect\'angulo es \alert{la mitad y de signo contrario} al del trapecio.
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=6.4cm,height=3.6cm,xmin=0,xmax=1,ymin=0,ymax=1.1,axis lines=left,
+  xtick={0,0.25,0.5,0.75,1},ytick=\empty,tick label style={font=\scriptsize},title={\scriptsize Rect\'angulo (punto medio)},title style={yshift=-4pt}]
+\foreach \a in {0,0.25,0.5,0.75}{
+  \edef\tmp{\noexpand\fill[gold!35,draw=gold] (axis cs:\a,0) rectangle (axis cs:\a+0.25,{exp(-(\a+0.125)^2)});
+  \noexpand\fill[gold!70!black] (axis cs:\a+0.125,{exp(-(\a+0.125)^2)}) circle (1.3pt);}\tmp}
+\addplot[navy,thick,domain=0:1,samples=60] {exp(-x^2)};
+\end{axis}
+\end{tikzpicture}
+\begin{tikzpicture}
+\begin{axis}[width=6.4cm,height=3.6cm,xmin=0,xmax=1,ymin=0,ymax=1.1,axis lines=left,
+  xtick={0,0.25,0.5,0.75,1},ytick=\empty,tick label style={font=\scriptsize},title={\scriptsize Trapecio},title style={yshift=-4pt}]
+\foreach \a in {0,0.25,0.5,0.75}{
+  \edef\tmp{\noexpand\fill[tealC!25,draw=tealC] (axis cs:\a,0) -- (axis cs:\a,{exp(-(\a)^2)}) -- (axis cs:\a+0.25,{exp(-(\a+0.25)^2)}) -- (axis cs:\a+0.25,0) -- cycle;}\tmp}
+\addplot[navy,thick,domain=0:1,samples=60] {exp(-x^2)};
+\end{axis}
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{La idea central: integral iterada $\Rightarrow$ producto tensorial}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\small
+En un rect\'angulo $[a,b]\times[c,d]$ (teorema de Fubini):
+\[
+I=\int_a^b\underbrace{\Big(\int_c^d f(x,y)\,dy\Big)}_{g(x)}dx
+\]
+Aplicamos una regla 1D con pesos $w_j$ a la integral interior y otra regla 1D con pesos $w_i$ a la exterior:
+\[
+g(x)\approx\sum_{j} w_j\,f(x,y_j)\quad\Longrightarrow\quad
+\boxed{\,I\approx\sum_{i}\sum_{j} w_i\,w_j\,f(x_i,y_j)\,}
+\]
+Los nodos 2D forman una \alert{malla} $\{x_i\}\times\{y_j\}$ y el peso de cada nodo es el \alert{producto} de los pesos 1D.
+\end{column}
+\begin{column}{0.41\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.95,font=\scriptsize]
+\draw[navy,thick] (0,0) rectangle (3.2,2.4);
+\foreach \x in {0.4,1.2,2.0,2.8}
+  \foreach \y in {0.3,0.9,1.5,2.1}
+    \fill[gold!80!black] (\x,\y) circle (1.6pt);
+\foreach \x/\l in {0.4/x_1,1.2/x_2,2.0/x_3,2.8/x_4} \node[below] at (\x,-0.05) {$\l$};
+\foreach \y/\l in {0.3/y_1,0.9/y_2,1.5/y_3,2.1/y_4} \node[left] at (-0.05,\y) {$\l$};
+\draw[hot,thick,dashed] (2.0,0) -- (2.0,2.4);
+\node[hot,align=center] at (2.0,2.85) {para $x_i$ fijo:\\integral en $y$};
+\node[align=center] at (1.6,-0.75) {peso del nodo $(i,j)$: $w_i\,w_j$};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\ideaclave{No hay que aprender m\'etodos nuevos: \alert{cualquier} regla 1D se convierte en una regla 2D (o 3D) multiplicando pesos.}
+\end{frame}
+
+% =====================================================================
+\section{Rect\'angulos y trapecios en 2D}
+% =====================================================================
+\begin{frame}{Regla del rect\'angulo (punto medio) en 2D}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\small
+Dividimos $[a,b]\times[c,d]$ en $n_x\times n_y$ celdas de tama\~no $h_x\times h_y$ y evaluamos $f$ en el \alert{centro} de cada celda:
+\[
+I\approx M=h_x h_y\sum_{i=1}^{n_x}\sum_{j=1}^{n_y} f\big(\bar x_i,\bar y_j\big)
+\]
+\[
+\bar x_i=a+\big(i-\tfrac12\big)h_x,\qquad \bar y_j=c+\big(j-\tfrac12\big)h_y
+\]
+\begin{itemize}
+\item Interpretaci\'on: suma de \emph{prismas} de base $h_xh_y$ y altura $f(\bar x_i,\bar y_j)$.
+\item $n_xn_y$ evaluaciones; no usa la frontera (\'util si $f$ es singular en el borde).
+\item Error: $O(h_x^2+h_y^2)$; exacta para funciones bilineales.
+\end{itemize}
+\end{column}
+\begin{column}{0.41\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.9,font=\scriptsize]
+\fill[gold!10] (0,0) rectangle (3.6,2.7);
+\draw[step=0.9,gray!60] (0,0) grid (3.6,2.7);
+\draw[navy,thick] (0,0) rectangle (3.6,2.7);
+\foreach \x in {0.45,1.35,2.25,3.15}
+  \foreach \y in {0.45,1.35,2.25}
+    \fill[gold!80!black] (\x,\y) circle (2pt);
+\draw[<->] (0,-0.3) -- (0.9,-0.3) node[midway,below]{$h_x$};
+\draw[<->] (-0.3,0) -- (-0.3,0.9) node[midway,left]{$h_y$};
+\node[below] at (0,-0.6) {$a$}; \node[below] at (3.6,-0.6) {$b$};
+\node[left] at (-0.6,0) {$c$}; \node[left] at (-0.6,2.7) {$d$};
+\node at (1.8,3.05) {$n_x=4,\ n_y=3$: 12 evaluaciones};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Regla del trapecio en 2D: la plantilla de pesos 1--2--4}
+\begin{columns}[T]
+\begin{column}{0.53\textwidth}
+\small
+Producto de dos trapecios 1D con pesos $(1,2,2,\dots,2,1)$:
+\[
+I\approx T=\frac{h_xh_y}{4}\sum_{i=0}^{n_x}\sum_{j=0}^{n_y} c_{ij}\,f(x_i,y_j),\qquad c_{ij}=c_i\,c_j
+\]
+\begin{itemize}
+\item Esquinas: $c_{ij}=1$; bordes: $c_{ij}=2$; interior: $c_{ij}=4$.
+\item Cada nodo interior lo comparten 4 celdas: de ah\'i el 4.
+\item $(n_x+1)(n_y+1)$ evaluaciones; usa los valores de la frontera (\'util con datos de una malla o de sensores).
+\item Error: $O(h_x^2+h_y^2)$.
+\end{itemize}
+\end{column}
+\begin{column}{0.43\textwidth}
+\centering
+\begin{tikzpicture}[scale=0.9,font=\footnotesize]
+\draw[step=0.9,gray!60] (0,0) grid (3.6,2.7);
+\draw[navy,thick] (0,0) rectangle (3.6,2.7);
+\foreach \i in {0,...,4}
+  \foreach \j in {0,...,3}{
+    \pgfmathtruncatemacro{\ci}{(\i==0 || \i==4) ? 1 : 2}
+    \pgfmathtruncatemacro{\cj}{(\j==0 || \j==3) ? 1 : 2}
+    \pgfmathtruncatemacro{\c}{\ci*\cj}
+    \ifnum\c=1 \def\col{gray}\fi
+    \ifnum\c=2 \def\col{tealC}\fi
+    \ifnum\c=4 \def\col{hot}\fi
+    \node[circle,fill=\col,text=white,inner sep=1.2pt,font=\scriptsize\bfseries] at (0.9*\i,0.9*\j) {\c};
+  }
+\node at (1.8,3.1) {$n_x=4,\ n_y=3$: 20 evaluaciones};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\begin{pregunta}
+Con la misma malla, ¿cu\'al cree que da menor error, el rect\'angulo o el trapecio? ¿Por cu\'anto?
+\end{pregunta}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Ejemplo de referencia}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\small
+\[
+I=\int_0^1\!\!\int_0^1 e^{-(x^2+y^2)}\,dy\,dx
+\]
+No tiene primitiva elemental, pero s\'i un valor exacto porque es separable:
+\[
+I=\Big(\int_0^1 e^{-x^2}dx\Big)^2=\Big(\frac{\sqrt\pi}{2}\,\mathrm{erf}(1)\Big)^2
+\]
+\[
+I=0.557\,746\,285\,4
+\]
+Este valor exacto permite medir el \alert{error real} de cada m\'etodo. (En un problema real no se conoce: se estima refinando la malla.)
+\end{column}
+\begin{column}{0.46\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{axis}[width=6.4cm,height=5.0cm,view={50}{30},xlabel={$x$},ylabel={$y$},zlabel={$f$},
+  xmin=0,xmax=1,ymin=0,ymax=1,zmin=0,zmax=1,colormap={nv}{rgb255=(18,38,74) rgb255=(0,121,128) rgb255=(196,145,32)},
+  tick label style={font=\tiny},label style={font=\scriptsize}]
+\addplot3[surf,shader=faceted interp,draw=white,line width=0.1pt,domain=0:1,y domain=0:1,samples=16] {exp(-(x^2+y^2))};
+\end{axis}
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Resultados: rect\'angulo vs.\ trapecio}
+\begin{columns}[T]
+\begin{column}{0.58\textwidth}
+\centering\small
+\begin{tabular}{@{}rrrrrc@{}}
+\toprule
+$n$ & \multicolumn{2}{c}{Rect\'angulo $M$} & \multicolumn{2}{c}{Trapecio $T$} & \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}
+ & eval. & error & eval. & error & $E_M/E_T$\\
+\midrule
+2 & 4 & $+1.17\times10^{-2}$ & 9 & $-2.28\times10^{-2}$ & $-0.511$\\
+4 & 16 & $+2.88\times10^{-3}$ & 25 & $-5.72\times10^{-3}$ & $-0.503$\\
+8 & 64 & $+7.16\times10^{-4}$ & 81 & $-1.43\times10^{-3}$ & $-0.501$\\
+16 & 256 & $+1.79\times10^{-4}$ & 289 & $-3.58\times10^{-4}$ & $-0.500$\\
+32 & 1024 & $+4.47\times10^{-5}$ & 1089 & $-8.94\times10^{-5}$ & $-0.500$\\
+\bottomrule
+\end{tabular}
+\end{column}
+\begin{column}{0.38\textwidth}
+\small
+\textbf{Lo que muestra la tabla:}
+\begin{itemize}
+\item Al duplicar $n$ ($h\to h/2$) el error cae $\approx4$ veces: \alert{orden 2}.
+\item El rect\'angulo, con \emph{menos} evaluaciones, tiene la \emph{mitad} del error.
+\item Los errores tienen signos opuestos y raz\'on $-\tfrac12$, igual que en 1D.
+\end{itemize}
+\end{column}
+\end{columns}
+\begin{pregunta}[Reto r\'apido]
+Si $E_M\approx-\tfrac12E_T$, ¿qu\'e combinaci\'on de $M$ y $T$ cancela el error de orden $h^2$?
+\end{pregunta}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Respuesta al reto: una regla de orden 4 ``gratis''}
+\begin{columns}[T]
+\begin{column}{0.52\textwidth}
+\small
+Si $M=I+E$ y $T=I-2E$, entonces
+\[
+S=\frac{2M+T}{3}=I+O(h^4)
+\]
+Es la misma idea que lleva de trapecio a Simpson en 1D (y la base de la extrapolaci\'on de Richardson).
+\end{column}
+\begin{column}{0.44\textwidth}
+\centering\small
+\begin{tabular}{@{}rcc@{}}
+\toprule
+$n$ & $S=(2M+T)/3$ & error\\
+\midrule
+2 & 0.557\,912\,9 & $1.67\times10^{-4}$\\
+4 & 0.557\,756\,6 & $1.03\times10^{-5}$\\
+8 & 0.557\,746\,9 & $6.46\times10^{-7}$\\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize Ahora el error cae $\approx16$ veces al duplicar $n$.
+\end{column}
+\end{columns}
+\ideaclave{Conocer la \alert{estructura del error} vale tanto como el m\'etodo: con dos reglas de orden 2 se construye una de orden 4. Pero, ¿se puede llegar a\'un m\'as lejos eligiendo mejor \emph{d\'onde} evaluar? $\Rightarrow$ Gauss.}
+\end{frame}
+
+% =====================================================================
+\section{Cuadratura de Gauss--Legendre}
+% =====================================================================
+\begin{frame}{Gauss--Legendre en 1D: nodos y pesos \'optimos}
+\begin{columns}[T]
+\begin{column}{0.52\textwidth}
+\small
+\[
+\int_{-1}^{1} f(t)\,dt\approx\sum_{k=1}^{n} w_k\,f(t_k)
+\]
+\begin{itemize}
+\item $2n$ par\'ametros libres ($n$ nodos y $n$ pesos) $\Rightarrow$ la regla es \alert{exacta para polinomios de grado $\le 2n-1$}.
+\item Los nodos $t_k$ son las ra\'ices del polinomio de Legendre $P_n(t)$; los pesos son positivos.
+\item Rect\'angulo y trapecio de un intervalo son exactos solo hasta grado 1.
+\item Los nodos son \emph{irracionales}: Gauss sirve cuando podemos evaluar $f$ donde queramos (no con datos tabulados).
+\end{itemize}
+\end{column}
+\begin{column}{0.44\textwidth}
+\centering\small
+\begin{tabular}{@{}clll@{}}
+\toprule
+$n$ & $t_k$ & $w_k$ & exacta\\
+\midrule
+1 & $0$ & $2$ & grado 1\\
+\midrule
+2 & $\pm1/\sqrt3$ & $1$ & grado 3\\
+ & {\scriptsize$=\pm0.577\,350$} & & \\
+\midrule
+3 & $0$ & $8/9$ & grado 5\\
+ & $\pm\sqrt{3/5}$ & $5/9$ & \\
+ & {\scriptsize$=\pm0.774\,597$} & & \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+\begin{tikzpicture}[font=\scriptsize]
+\draw[navy] (-2,0) -- (2,0);
+\foreach \x/\l in {-2/-1,0/0,2/1} {\draw (\x,0.08) -- (\x,-0.08) node[below]{$\l$};}
+\foreach \x in {-1.5492,0,1.5492} \fill[gold!80!black] (\x,0) circle (2pt);
+\node[right] at (2.1,0) {$n=3$};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Cambio de variable: de $[-1,1]^2$ a $[a,b]\times[c,d]$}
+\begin{columns}[T]
+\begin{column}{0.55\textwidth}
+\small
+Transformaci\'on af\'in en cada direcci\'on:
+\[
+x=\frac{b-a}{2}\,t+\frac{a+b}{2},\qquad y=\frac{d-c}{2}\,s+\frac{c+d}{2}
+\]
+\[
+dx\,dy=|J|\,dt\,ds,\qquad |J|=\frac{(b-a)(d-c)}{4}
+\]
+\vspace{-2pt}Regla de Gauss producto tensorial $n\times n$:
+\[
+\boxed{\,I\approx\frac{(b-a)(d-c)}{4}\sum_{i=1}^{n}\sum_{j=1}^{n}w_i\,w_j\,f\big(x(t_i),\,y(s_j)\big)\,}
+\]
+Exacta para $f$ de grado $\le 2n-1$ \alert{en cada variable} por separado.
+\end{column}
+\begin{column}{0.41\textwidth}
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+\begin{scope}
+\draw[navy,thick] (0,0) rectangle (2,2);
+\foreach \t in {0.4226,1.5774} \foreach \s in {0.4226,1.5774} \fill[gold!80!black] (\t,\s) circle (2pt);
+\node[below] at (1,-0.05) {$2\times2$ (4 nodos)};
+\end{scope}
+\begin{scope}[xshift=2.5cm]
+\draw[navy,thick] (0,0) rectangle (2,2);
+\foreach \t in {0.2254,1,1.7746} \foreach \s in {0.2254,1,1.7746}{
+  \pgfmathsetmacro{\r}{ (abs(\t-1)<0.01 ? 0.89 : 0.56)*(abs(\s-1)<0.01 ? 0.89 : 0.56) }
+  \fill[tealC] (\t,\s) circle ({5.5*\r pt});}
+\node[below] at (1,-0.05) {$3\times3$ (9 nodos)};
+\end{scope}
+\node[align=center] at (2.25,-0.95) {en $3\times3$ el tama\~no del punto es\\proporcional a su peso $w_iw_j$};
+\end{tikzpicture}
+\end{column}
+\end{columns}
+\begin{pregunta}
+¿Qu\'e error t\'ipico aparece si se olvida el jacobiano $(b-a)(d-c)/4$ en un dominio $[0,2]\times[0,1]$?
+\end{pregunta}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Ejemplo resuelto a mano: Gauss $2\times2$}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\small
+Dominio $[0,1]^2$: $\;x=\tfrac12 t+\tfrac12$, $\;|J|=\tfrac14$, $\;w_i=w_j=1$.
+\[
+x_{1,2}=y_{1,2}=\tfrac12\mp\tfrac{1}{2\sqrt3}=0.211\,325,\ 0.788\,675
+\]
+\[
+I\approx\frac14\sum_{i=1}^{2}\sum_{j=1}^{2}f(x_i,y_j)=\frac{2.229\,615}{4}
+\]
+\[
+I\approx\mathbf{0.557\,404}\qquad (\text{error } -3.4\times10^{-4})
+\]
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering\small
+\begin{tabular}{@{}ccc@{}}
+\toprule
+$x_i$ & $y_j$ & $f(x_i,y_j)$\\
+\midrule
+0.211\,325 & 0.211\,325 & 0.914\,556\\
+0.211\,325 & 0.788\,675 & 0.513\,417\\
+0.788\,675 & 0.211\,325 & 0.513\,417\\
+0.788\,675 & 0.788\,675 & 0.288\,224\\
+\midrule
+ & Suma & 2.229\,615\\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+\ideaclave{Con \alert{solo 4 evaluaciones}, Gauss $2\times2$ logra el mismo error que el trapecio con $n=16$, que usa \alert{289}. Con las mismas 4 evaluaciones, el rect\'angulo ($n=2$) tiene error $1.2\times10^{-2}$, unas 34 veces mayor.}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Exactitud polin\'omica: un ejemplo que Gauss resuelve sin error}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\small
+\[
+I=\int_0^2\!\!\int_0^1\big(x^3y^2+xy\big)\,dy\,dx=\frac73=2.333\,333
+\]
+Grado 3 en $x$ y grado 2 en $y$ $\Rightarrow$ Gauss $2\times2$ (exacta hasta grado 3 en cada variable) debe dar el valor exacto.
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+M\'etodo & eval. & resultado\\
+\midrule
+Gauss $1\times1$ & 1 & 1.500\,000\\
+\textbf{Gauss} $\mathbf{2\times2}$ & \textbf{4} & \textbf{2.333\,333} (exacto)\\
+\midrule
+Rect\'angulo $n=8$ & 64 & 2.317\,749\\
+Trapecio $n=8$ & 81 & 2.364\,746\\
+\bottomrule
+\end{tabular}
+\end{column}
+\end{columns}
+\ideaclave{Gauss no ``adivina'': integra exactamente el polinomio que mejor aproxima a $f$ en sus nodos. Cuanto m\'as se parezca $f$ a un polinomio de bajo grado (suave), m\'as r\'apido converge.}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Convergencia: error vs.\ n\'umero de evaluaciones de $f$}
+\begin{columns}[T]
+\begin{column}{0.56\textwidth}
+\centering
+\begin{tikzpicture}
+\begin{loglogaxis}[width=7.6cm,height=5.6cm,xlabel={evaluaciones de $f$},ylabel={$|$error$|$},
+  grid=major,grid style={gray!20},legend style={font=\scriptsize,at={(0.03,0.03)},anchor=south west},
+  tick label style={font=\scriptsize},label style={font=\scriptsize},ymin=1e-11,ymax=1]
+\addplot[gold!80!black,very thick,mark=square*,mark size=1.6pt] coordinates {(4,1.167e-02) (16,2.876e-03) (64,7.164e-04) (256,1.789e-04) (1024,4.472e-05) (4096,1.118e-05)};
+\addplot[tealC,very thick,mark=triangle*,mark size=2pt] coordinates {(4,8.997e-02) (9,2.284e-02) (25,5.721e-03) (81,1.431e-03) (289,3.577e-04) (1089,8.943e-05) (4225,2.236e-05)};
+\addplot[navy,very thick,mark=*,mark size=1.6pt] coordinates {(1,4.878e-02) (4,3.427e-04) (9,1.426e-05) (16,5.008e-07) (25,9.031e-09) (36,1.161e-10)};
+\legend{Rect\'angulo,Trapecio,Gauss $n\times n$}
+\end{loglogaxis}
+\end{tikzpicture}
+\end{column}
+\begin{column}{0.40\textwidth}
+\small
+\begin{itemize}
+\item Rect\'angulo y trapecio: rectas de pendiente $-1$ en esta gr\'afica, porque $N\propto h^{-2}$ y el error $\propto h^2=N^{-1}$.
+\item Gauss: convergencia \alert{exponencial} para $f$ suave (la curva cae cada vez m\'as r\'apido).
+\item Para error $\sim10^{-10}$: Gauss usa 36 evaluaciones; el trapecio necesitar\'ia del orden de $10^{9}$.
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\section{Dominios no rectangulares}
+% =====================================================================
+\begin{frame}{L\'imites variables: $c(x)\le y\le d(x)$}
+\begin{columns}[T]
+\begin{column}{0.54\textwidth}
+\small
+\[
+I=\int_a^b\int_{c(x)}^{d(x)} f(x,y)\,dy\,dx
+\]
+\textbf{Algoritmo (Gauss en ambas direcciones):}
+\begin{enumerate}
+\item Elegir los $n$ nodos $x_i$ de Gauss en $[a,b]$.
+\item Para cada $x_i$, mapear $[c(x_i),d(x_i)]$ a $[-1,1]$ y aplicar Gauss en $y$:
+\[
+g(x_i)\approx\frac{d(x_i)-c(x_i)}{2}\sum_j w_j\,f(x_i,y_{ij})
+\]
+\item Integrar $g$ en $x$: $\;I\approx\dfrac{b-a}{2}\sum_i w_i\,g(x_i)$.
+\end{enumerate}
+Los nodos en $y$ \alert{cambian con cada $x_i$}: ya no forman una malla regular.
+\end{column}
+\begin{column}{0.42\textwidth}
+\centering
+\begin{tikzpicture}[scale=2.6,font=\scriptsize]
+\fill[navyL] (0,0) -- (1,0) arc (0:90:1) -- cycle;
+\draw[navy,thick] (0,0) -- (1,0) arc (0:90:1) -- cycle;
+\foreach \x in {0.0469,0.2308,0.5,0.7692,0.9531}{
+  \pgfmathsetmacro{\d}{sqrt(1-\x*\x)}
+  \draw[hot,dashed,thin] (\x,0) -- (\x,\d);
+  \foreach \s in {0.0469,0.2308,0.5,0.7692,0.9531}
+     \fill[gold!80!black] (\x,{\s*\d}) circle (0.45pt);}
+\node[below] at (0.5,-0.02) {$x$};
+\node[left] at (-0.02,0.5) {$y$};
+\node at (0.55,1.08) {$y=\sqrt{1-x^2}$};
+\end{tikzpicture}
+\par{\scriptsize Gauss $5\times5$ en un cuarto de c\'irculo}
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Aplicaci\'on: momento polar de inercia de un cuarto de c\'irculo}
+\small
+\[
+J=\iint_D(x^2+y^2)\,dA,\qquad D:\ \text{cuarto de c\'irculo de radio }R=1,\qquad J_{\text{exacto}}=\frac{\pi R^4}{8}=0.392\,699\,08
+\]
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Coordenadas cartesianas}, $\;0\le y\le\sqrt{1-x^2}$:\\[3pt]
+\centering
+\begin{tabular}{@{}rrc@{}}
+\toprule
+$n$ & eval. & error\\
+\midrule
+2 & 4 & $+1.47\times10^{-2}$\\
+4 & 16 & $+1.76\times10^{-3}$\\
+8 & 64 & $+2.43\times10^{-4}$\\
+16 & 256 & $+3.26\times10^{-5}$\\
+\bottomrule
+\end{tabular}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{Coordenadas polares}, $\;dA=r\,dr\,d\theta$:
+\[
+J=\int_0^{\pi/2}\!\!\int_0^1 r^3\,dr\,d\theta
+\]
+Integrando polinomial de grado 3 en $r$ y constante en $\theta$: Gauss con \alert{2 nodos en $r$} da el valor \alert{exacto}.
+\end{column}
+\end{columns}
+\ideaclave{En cartesianas Gauss converge lento: $d(x)=\sqrt{1-x^2}$ tiene derivada infinita en $x=1$ y no se parece a un polinomio. \alert{Elegir bien las coordenadas} puede valer m\'as que refinar la malla.}
+\end{frame}
+
+% =====================================================================
+\section{Integrales triples y m\'ultiples}
+% =====================================================================
+\begin{frame}{Tres dimensiones: la misma receta}
+\begin{columns}[T]
+\begin{column}{0.52\textwidth}
+\small
+En un paralelep\'ipedo $[a_1,b_1]\times[a_2,b_2]\times[a_3,b_3]$:
+\[
+I\approx|J|\sum_{i}\sum_{j}\sum_{k}w_iw_jw_k\,f(x_i,y_j,z_k),\quad |J|=\prod_{m=1}^{3}\frac{b_m-a_m}{2}
+\]
+Trapecio 3D: pesos $c_ic_jc_k\in\{1,2,4,8\}$ (v\'ertices, aristas, caras, interior) y factor $h_xh_yh_z/8$.\\[4pt]
+Ejemplo: $\displaystyle\iiint_{[0,1]^3}e^{-(x^2+y^2+z^2)}dV=0.416\,538\,386$
+\end{column}
+\begin{column}{0.44\textwidth}
+\centering\small
+\begin{tabular}{@{}lrc@{}}
+\toprule
+M\'etodo & eval. & error\\
+\midrule
+Gauss $2^3$ & 8 & $-3.84\times10^{-4}$\\
+Gauss $3^3$ & 27 & $-1.60\times10^{-5}$\\
+Gauss $4^3$ & 64 & $+5.61\times10^{-7}$\\
+\midrule
+Trapecio $n=4$ & 125 & $-6.39\times10^{-3}$\\
+Trapecio $n=8$ & 729 & $-1.60\times10^{-3}$\\
+Trapecio $n=16$ & 4913 & $-4.01\times10^{-4}$\\
+\bottomrule
+\end{tabular}
+\par\smallskip\footnotesize Gauss con 8 evaluaciones $\approx$ trapecio con 4913.
+\end{column}
+\end{columns}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{La maldici\'on de la dimensionalidad}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\small
+Con $n$ nodos por eje, una regla producto en $d$ dimensiones usa $N=n^d$ evaluaciones. Con $n=10$:\\[4pt]
+\centering
+\begin{tabular}{@{}rr@{}}
+\toprule
+$d$ & $N=10^d$\\
+\midrule
+1 & 10\\
+2 & 100\\
+3 & 1\,000\\
+6 & 1\,000\,000\\
+10 & $10^{10}$\\
+\bottomrule
+\end{tabular}
+\end{column}
+\begin{column}{0.48\textwidth}
+\small
+\begin{itemize}
+\item Para una regla de orden $p$: error $\propto h^p\propto N^{-p/d}$. Con $d$ grande, el orden ``se diluye''.
+\item \textbf{Monte Carlo}: error $\propto N^{-1/2}$ \alert{independiente de $d$}. Gana a las reglas producto cuando $d\gtrsim 5$ a $10$ (finanzas, f\'isica estad\'istica, incertidumbre).
+\item Alternativas intermedias: rejillas dispersas (Smolyak), cuadraturas adaptativas.
+\end{itemize}
+\end{column}
+\end{columns}
+\ideaclave{Para 2 y 3 dimensiones (la mayor\'ia de problemas de ingenier\'ia mec\'anica) las reglas producto de Gauss son la herramienta de elecci\'on: es exactamente lo que usan los programas de \alert{elementos finitos} para integrar en cada elemento.}
+\end{frame}
+
+% =====================================================================
+\section{Implementaci\'on en Python}
+% =====================================================================
+\begin{frame}[fragile]{Rect\'angulo y trapecio en 2D (vectorizado con NumPy)}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\begin{lstlisting}
+import numpy as np
+
+def rectangulo_2d(f, a, b, c, d, nx, ny):
+    hx, hy = (b-a)/nx, (d-c)/ny
+    xm = a + hx*(np.arange(nx) + 0.5)
+    ym = c + hy*(np.arange(ny) + 0.5)
+    X, Y = np.meshgrid(xm, ym, indexing="ij")
+    return hx*hy*np.sum(f(X, Y))
+\end{lstlisting}
+\end{column}
+\begin{column}{0.48\textwidth}
+\begin{lstlisting}
+def trapecio_2d(f, a, b, c, d, nx, ny):
+    hx, hy = (b-a)/nx, (d-c)/ny
+    x = np.linspace(a, b, nx+1)
+    y = np.linspace(c, d, ny+1)
+    wx = np.full(nx+1, 2.0); wx[[0,-1]] = 1
+    wy = np.full(ny+1, 2.0); wy[[0,-1]] = 1
+    W = np.outer(wx, wy)     # pesos 1-2-4
+    X, Y = np.meshgrid(x, y, indexing="ij")
+    return hx*hy/4*np.sum(W*f(X, Y))
+\end{lstlisting}
+\end{column}
+\end{columns}
+\smallskip
+\begin{lstlisting}
+f = lambda x, y: np.exp(-(x**2 + y**2))
+print(rectangulo_2d(f, 0, 1, 0, 1, 16, 16))   # 0.55792521
+print(trapecio_2d(f, 0, 1, 0, 1, 16, 16))     # 0.55738856
+\end{lstlisting}
+\ideaclave{\texttt{np.outer} construye la plantilla de pesos como \alert{producto tensorial}, igual que en la teor\'ia.}
+\end{frame}
+
+% =====================================================================
+\begin{frame}[fragile]{Gauss--Legendre 2D y comparaci\'on con SciPy}
+\begin{columns}[T]
+\begin{column}{0.53\textwidth}
+\begin{lstlisting}
+def gauss_2d(f, a, b, c, d, n):
+    t, w = np.polynomial.legendre.leggauss(n)
+    x = (b-a)/2*t + (a+b)/2      # [-1,1] -> [a,b]
+    y = (d-c)/2*t + (c+d)/2
+    X, Y = np.meshgrid(x, y, indexing="ij")
+    jac = (b-a)*(d-c)/4          # no olvidarlo!
+    return jac*np.sum(np.outer(w, w)*f(X, Y))
+
+for n in range(1, 7):
+    print(n, gauss_2d(f, 0, 1, 0, 1, n))
+\end{lstlisting}
+\end{column}
+\begin{column}{0.44\textwidth}
+\begin{lstlisting}
+from scipy import integrate
+
+# dblquad integra primero en y:
+# el orden de argumentos es f(y, x)
+I, err = integrate.dblquad(
+    lambda y, x: f(x, y),
+    0, 1,                        # x
+    0, lambda x: np.sqrt(1-x**2) # y
+)
+\end{lstlisting}
+\footnotesize
+\texttt{dblquad} es \emph{adaptativa}: refina donde hace falta y entrega una estimaci\'on del error. \'Usela como referencia, no como sustituto de entender el m\'etodo.
+\end{column}
+\end{columns}
+\smallskip
+\footnotesize El script completo (\texttt{integracion\_multiple.py}) incluye la versi\'on con l\'imites variables, la versi\'on 3D y todas las tablas de esta clase.
+\end{frame}
+
+% =====================================================================
+\section{S\'intesis}
+% =====================================================================
+\begin{frame}{Resumen comparativo}
+\centering\footnotesize
+\begin{tabular}{@{}L{2.7cm}L{2.4cm}L{1.6cm}L{2.6cm}L{3.3cm}@{}}
+\toprule
+M\'etodo & Nodos & Orden & Exacta para & Cu\'ando usarla\\
+\midrule
+Rect\'angulo (punto medio) & centros de celda & $O(h^2)$ & bilineales & $f$ singular en el borde\\
+Trapecio & v\'ertices de la malla & $O(h^2)$ & bilineales & datos tabulados en una malla\\
+$(2M+T)/3$ & ambos & $O(h^4)$ & grado total $\le3$ & mejorar $M$ y $T$ sin costo\\
+Gauss $n\times n$ & ra\'ices de $P_n$ & exponencial* & grado $2n-1$ por variable & $f$ suave y evaluable donde se quiera\\
+Monte Carlo & aleatorios & $N^{-1/2}$ & -- & dimensi\'on alta\\
+\bottomrule
+\end{tabular}
+\par\smallskip{\scriptsize *para funciones anal\'iticas (muy suaves) en el dominio.}
+\begin{clave}\small
+\textbf{\textcolor{navy}{Errores frecuentes.}} (1) olvidar el jacobiano del cambio de variable; (2) invertir el orden de los argumentos en \texttt{dblquad}; (3) usar Gauss sobre una funci\'on con discontinuidades o derivadas infinitas sin dividir el dominio o cambiar de coordenadas; (4) comparar m\'etodos por $n$ en vez de por \alert{n\'umero de evaluaciones}.
+\end{clave}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Ejercicios propuestos}
+\small
+\begin{enumerate}
+\item \textbf{Placa con densidad variable.} Una placa $[0,0.4]\times[0,0.3]$ m tiene $\rho(x,y)=7800\,(1+0.5\,e^{-10x}\cos(5y))$ kg/m$^3$ y espesor 5 mm. Calcule su masa y su centro de masa con trapecio ($n=4,8,16$) y Gauss ($2\times2$, $3\times3$). ¿Cu\'antas evaluaciones necesita cada m\'etodo para 4 cifras correctas?
+\item \textbf{Compuerta hidrost\'atica.} Calcule la fuerza del agua sobre una compuerta semicircular vertical de radio 1 m cuyo di\'ametro est\'a en la superficie libre ($p=\rho g y$). Hágalo en cartesianas y en polares, y explique la diferencia de convergencia.
+\item \textbf{Orden emp\'irico.} Para el ejemplo de referencia, grafique en log--log el error del rect\'angulo y del trapecio contra $h$ y estime la pendiente. Repita con $(2M+T)/3$.
+\item \textbf{Integral triple.} Calcule la masa de un bloque $[0,1]^3$ con densidad $\rho=1+xyz+\sin(\pi z)$ con Gauss $n^3$ y con \texttt{tplquad}. ¿Con qu\'e $n$ es exacta la parte polin\'omica?
+\item \textbf{(Reto) Monte Carlo.} Estime el volumen de la esfera unitaria en $d=2,3,5,8$ por Monte Carlo y por una regla producto con el mismo $N$. ¿A partir de qu\'e $d$ gana Monte Carlo?
+\end{enumerate}
+\end{frame}
+
+% =====================================================================
+\begin{frame}{Referencias}
+\setbeamerfont{itemize/enumerate body}{size=\scriptsize}\scriptsize
+\begin{itemize}
+\item Chapra, S. C., Canale, R. P. \emph{M\'etodos num\'ericos para ingenieros}, 7.\textordfeminine{} ed. McGraw-Hill, 2015. (Integraci\'on num\'erica y cuadratura de Gauss.)
+\item Burden, R. L., Faires, J. D., Burden, A. M. \emph{An\'alisis num\'erico}, 10.\textordfeminine{} ed. Cengage, 2017. (Integrales m\'ultiples.)
+\item Davis, P. J., Rabinowitz, P. \emph{Methods of Numerical Integration}, 2.\textordfeminine{} ed. Academic Press, 1984.
+\item Stroud, A. H. \emph{Approximate Calculation of Multiple Integrals}. Prentice-Hall, 1971.
+\item Trefethen, L. N. Is Gauss quadrature better than Clenshaw--Curtis? \emph{SIAM Review} 50 (2008) 67--87.
+\item Documentaci\'on: \texttt{numpy.polynomial.legendre.leggauss}, \texttt{scipy.integrate.dblquad}, \texttt{scipy.integrate.tplquad}.
+\end{itemize}
+\end{frame}
+
+\end{document}
